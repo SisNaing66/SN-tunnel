@@ -41,13 +41,13 @@
             app:cardElevation="10dp"
             app:strokeColor="#334155"
             app:strokeWidth="3dp">
-
+            
             <ImageView
                 android:id="@+id/imgPower"
                 android:layout_width="70dp"
                 android:layout_height="70dp"
                 android:layout_gravity="center"
-                android:src="@android:drawable/ic_lock_power_snapshot"
+                android:src="@drawable/ic_lock_power_snapshot"
                 app:tint="#94A3B8" />
         </com.google.android.material.card.MaterialCardView>
 
@@ -81,11 +81,11 @@
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:padding="16dp">
-
+            
             <ImageView
                 android:layout_width="24dp"
                 android:layout_height="24dp"
-                android:src="@android:drawable/ic_menu_compass"
+                android:src="@drawable/ic_menu_compass"
                 app:tint="#38BDF8" />
 
             <TextView
