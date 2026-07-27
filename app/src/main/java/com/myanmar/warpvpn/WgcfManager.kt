@@ -37,7 +37,7 @@ class WgcfManager {
         val ipv4 = result.getJSONObject("config").getJSONObject("interface").getJSONObject("addresses").getString("v4")
         val ipv6 = result.getJSONObject("config").getJSONObject("interface").getJSONObject("addresses").getString("v6")
 
-        // 2. Myanmar Clean IP နှင့် WireGuard Config Content တည်ဆောက်ခြင်း
+        // 2. Myanmar Clean IP
         val cleanIp = "162.159.192.1"
         val cleanPort = "500"
 
