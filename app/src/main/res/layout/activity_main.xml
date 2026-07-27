@@ -5,11 +5,12 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- Main Content -->
+    <!-- Main Content Background -->
     <RelativeLayout
+        android:id="@+id/mainBackground"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#0F172A"
+        android:background="?android:attr/colorBackground"
         android:padding="20dp">
 
         <!-- Top Bar with Menu Button & Title -->
@@ -28,7 +29,7 @@
                 android:clickable="true"
                 android:focusable="true"
                 android:src="@android:drawable/ic_menu_sort_by_size"
-                app:tint="#FFFFFF" />
+                app:tint="?attr/colorOnBackground" />
 
             <TextView
                 android:id="@+id/tvTitle"
@@ -37,7 +38,7 @@
                 android:layout_centerInParent="true"
                 android:letterSpacing="0.2"
                 android:text="WARP TUNNEL"
-                android:textColor="#FFFFFF"
+                android:textColor="?attr/colorOnBackground"
                 android:textSize="20sp"
                 android:textStyle="bold" />
         </RelativeLayout>
@@ -59,9 +60,9 @@
                 android:layout_height="160dp"
                 android:clickable="true"
                 android:focusable="true"
-                app:cardBackgroundColor="#1E293B"
+                app:cardBackgroundColor="?attr/colorSurface"
                 app:cardCornerRadius="80dp"
-                app:cardElevation="10dp"
+                app:cardElevation="6dp"
                 app:strokeColor="#334155"
                 app:strokeWidth="3dp">
 
@@ -93,9 +94,8 @@
             android:layout_height="wrap_content"
             android:layout_below="@id/layoutPower"
             android:layout_marginTop="30dp"
-            app:cardBackgroundColor="#1E293B"
+            app:cardBackgroundColor="?attr/colorSurface"
             app:cardCornerRadius="20dp"
-            app:strokeColor="#334155"
             app:strokeWidth="1dp">
 
             <LinearLayout
@@ -118,7 +118,7 @@
                     android:layout_marginStart="12dp"
                     android:layout_weight="1"
                     android:text="WARP Auto Clean IP [162.159.192.1]"
-                    android:textColor="#FFFFFF"
+                    android:textColor="?attr/colorOnBackground"
                     android:textSize="14sp"
                     android:textStyle="bold" />
 
@@ -137,9 +137,8 @@
             android:layout_height="match_parent"
             android:layout_below="@id/cardServer"
             android:layout_marginTop="20dp"
-            app:cardBackgroundColor="#020617"
+            app:cardBackgroundColor="?attr/colorSurface"
             app:cardCornerRadius="16dp"
-            app:strokeColor="#1E293B"
             app:strokeWidth="1dp">
 
             <LinearLayout
@@ -176,7 +175,7 @@
 
     </RelativeLayout>
 
-    <!-- Navigation Side Drawer Include -->
+    <!-- Side Navigation Menu -->
     <include layout="@layout/nav_drawer" />
 
 </androidx.drawerlayout.widget.DrawerLayout>
