@@ -7,11 +7,15 @@ on:
   pull_request:
     branches:
       - main
-  workflow_dispatch: # Actions tab ထဲမှ Manual နှိပ်ပြီး Build နိုင်အောင် ထည့်ပေးထားခြင်း
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: ./wgcf-vpn
 
     steps:
       - name: Checkout Code
@@ -23,7 +27,6 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      # Gradle Wrapper (gradlew) မရှိသေးပါက Automatic ပြန်ထုတ်ပေးမည့် Step
       - name: Validate or Generate Gradle Wrapper
         run: |
           if [ ! -f "./gradlew" ]; then
@@ -31,21 +34,17 @@ jobs:
             gradle wrapper
           fi
 
-      # Gradle Setup & Caching
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      # Execute Permission ပေးခြင်း
       - name: Grant Execute Permission for Gradle Wrapper
         run: chmod +x ./gradlew
 
-      # Debug APK ဆောက်ခြင်း
       - name: Build Debug APK
         run: ./gradlew assembleDebug --no-daemon
 
-      # Build ထွက်လာသော APK ကို Artifact အဖြစ် တင်ပေးခြင်း
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: WARP-VPN-Debug-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: wgcf-vpn/app/build/outputs/apk/debug/app-debug.apk
