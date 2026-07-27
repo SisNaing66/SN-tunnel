@@ -7,6 +7,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import com.wireguard.crypto.KeyPair
 import java.util.UUID
 
 class WgcfManager {
@@ -14,10 +15,15 @@ class WgcfManager {
     private val apiBase = "https://api.cloudflareclient.com/v0i1909051800"
 
     suspend fun registerAndGetConfig(): String = withContext(Dispatchers.IO) {
-        // 1. Account Register
+        // 1. WireGuard KeyPair (Private Key & Public Key)
+        val keyPair = KeyPair()
+        val privateKey = keyPair.privateKey.toBase64()
+        val publicKey = keyPair.publicKey.toBase64()
+
+        // 2. Cloudflare API Payload
         val installId = UUID.randomUUID().toString()
         val regJson = JSONObject().apply {
-            put("key", "")
+            put("key", publicKey)
             put("install_id", installId)
             put("fcm_token", "")
             put("tos", "2024-01-01T00:00:00.000Z")
@@ -42,7 +48,6 @@ class WgcfManager {
 
         val rootJson = JSONObject(responseData)
 
-        // Result Object
         val result = if (rootJson.has("result") && !rootJson.isNull("result")) {
             rootJson.getJSONObject("result")
         } else {
@@ -52,26 +57,26 @@ class WgcfManager {
         // Config Data
         val config = result.getJSONObject("config")
         val peers = config.getJSONArray("peers").getJSONObject(0)
-        val publicKey = peers.getString("public_key")
+        val serverPublicKey = peers.getString("public_key")
         
         val interfaceObj = config.getJSONObject("interface")
         val addresses = interfaceObj.getJSONObject("addresses")
         val ipv4 = addresses.getString("v4")
         val ipv6 = addresses.getString("v6")
 
-        // If the Private Key is not available in the Register response, you will need to generate it on the client side.
-        // Building Dynamic Config
+        // Clean IP & Port
         val cleanIp = "162.159.192.1"
         val cleanPort = "500"
 
+        // WireGuard Config String
         return@withContext """
             [Interface]
-            PrivateKey = <YOUR_PRIVATE_KEY>
+            PrivateKey = $privateKey
             Address = $ipv4/32, $ipv6/128
             DNS = 1.1.1.1, 1.0.0.1
 
             [Peer]
-            PublicKey = $publicKey
+            PublicKey = $serverPublicKey
             Endpoint = $cleanIp:$cleanPort
             AllowedIPs = 0.0.0.0/0, ::/0
         """.trimIndent()
