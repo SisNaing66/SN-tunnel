@@ -1,23 +1,153 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="16dp">
+    android:background="#0F172A"
+    android:padding="20dp">
 
+    <!-- App Bar Title -->
     <TextView
-        android:id="@+id/tvStatus"
+        android:id="@+id/tvTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Status: Disconnected"
-        android:textSize="18sp"
         android:layout_centerHorizontal="true"
-        android:layout_marginTop="100dp" />
+        android:layout_marginTop="20dp"
+        android:letterSpacing="0.2"
+        android:text="WARP TUNNEL"
+        android:textColor="#FFFFFF"
+        android:textSize="20sp"
+        android:textStyle="bold" />
 
-    <Button
-        android:id="@+id/btnConnect"
+    <!-- Big Circular Connect Button -->
+    <LinearLayout
+        android:id="@+id/layoutPower"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/tvTitle"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="50dp"
+        android:gravity="center"
+        android:orientation="vertical">
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/btnConnectCard"
+            android:layout_width="160dp"
+            android:layout_height="160dp"
+            android:clickable="true"
+            android:focusable="true"
+            app:cardBackgroundColor="#1E293B"
+            app:cardCornerRadius="80dp"
+            app:cardElevation="10dp"
+            app:strokeColor="#334155"
+            app:strokeWidth="3dp">
+
+            <ImageView
+                android:id="@+id/imgPower"
+                android:layout_width="70dp"
+                android:layout_height="70dp"
+                android:layout_gravity="center"
+                android:src="@android:drawable/ic_lock_power_snapshot"
+                app:tint="#94A3B8" />
+        </com.google.android.material.card.MaterialCardView>
+
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:letterSpacing="0.1"
+            android:text="TAP TO CONNECT"
+            android:textColor="#94A3B8"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Server / Config Selector Box -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/cardServer"
         android:layout_width="match_parent"
-        android:layout_height="60dp"
-        android:text="Generate Config &amp; Connect"
-        android:layout_centerInParent="true" />
+        android:layout_height="wrap_content"
+        android:layout_below="@id/layoutPower"
+        android:layout_marginTop="40dp"
+        app:cardBackgroundColor="#1E293B"
+        app:cardCornerRadius="20dp"
+        app:strokeColor="#334155"
+        app:strokeWidth="1dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="16dp">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@android:drawable/ic_menu_compass"
+                app:tint="#38BDF8" />
+
+            <TextView
+                android:id="@+id/tvServerName"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:text="WARP Auto Clean IP [162.159.192.1]"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@android:drawable/arrow_down_float"
+                app:tint="#94A3B8" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- Connection Logs Card -->
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/cardServer"
+        android:layout_marginTop="20dp"
+        app:cardBackgroundColor="#020617"
+        app:cardCornerRadius="16dp"
+        app:strokeColor="#1E293B"
+        app:strokeWidth="1dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:letterSpacing="0.1"
+                android:text="CONNECTION LOGS"
+                android:textColor="#64748B"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_marginTop="10dp">
+
+                <TextView
+                    android:id="@+id/tvLogs"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:text="> Waiting for connection...\n"
+                    android:textColor="#4ADE80"
+                    android:textSize="12sp" />
+            </ScrollView>
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
 
 </RelativeLayout>
