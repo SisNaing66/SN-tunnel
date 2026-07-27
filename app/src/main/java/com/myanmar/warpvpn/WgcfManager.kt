@@ -23,13 +23,15 @@ class WgcfManager {
 
     suspend fun registerAndGetConfig(): String = withContext(Dispatchers.IO) {
         try {
+            // 1. Direct Cloudflare API
             return@withContext fetchFromCloudflareApi()
         } catch (e: Exception) {
             e.printStackTrace()
+            // 2. Custom PHP Backup API
             return@withContext fetchFromCustomApi()
         }
     }
-    
+
     private fun fetchFromCloudflareApi(): String {
         val keyPair = KeyPair()
         val privateKey = keyPair.privateKey.toBase64()
@@ -54,10 +56,10 @@ class WgcfManager {
             .build()
 
         val response = client.newCall(regRequest).execute()
-        val responseData = response.body?.string() ?: throw Exception("CF API Empty")
+        val responseData = response.body?.string() ?: throw Exception("CF API Response Empty")
 
         if (!response.isSuccessful) {
-            throw Exception("CF API Failed: Code ${response.code}")
+            throw Exception("CF API Failed Code: ${response.code}")
         }
 
         val rootJson = JSONObject(responseData)
@@ -91,7 +93,7 @@ class WgcfManager {
             AllowedIPs = 0.0.0.0/0, ::/0
         """.trimIndent()
     }
-    
+
     private fun fetchFromCustomApi(): String {
         val userId = (100000..999999).random().toString()
         val requestUrl = "$customApiUrl?user_id=$userId"
@@ -108,7 +110,7 @@ class WgcfManager {
         val success = json.optBoolean("success", false)
 
         if (!success) {
-            val errorMsg = json.optString("error", "Unknown Backup API Error")
+            val errorMsg = json.optString("error", "Backup API Error")
             throw Exception("Backup API Failed: $errorMsg")
         }
 
@@ -116,11 +118,10 @@ class WgcfManager {
         val privateKey = configObj.getString("private_key")
         val address = configObj.getString("address")
         val publicKey = configObj.getString("public_key")
-        val reserved = configObj.optString("reserved", "0,0,0")
 
         val cleanIp = "162.159.192.1"
         val cleanPort = "500"
-
+        
         return """
             [Interface]
             PrivateKey = $privateKey
@@ -131,7 +132,6 @@ class WgcfManager {
             PublicKey = $publicKey
             Endpoint = $cleanIp:$cleanPort
             AllowedIPs = 0.0.0.0/0, ::/0
-            Reserved = $reserved
         """.trimIndent()
     }
 }
