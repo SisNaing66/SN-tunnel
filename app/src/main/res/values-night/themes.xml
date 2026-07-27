@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Dark Mode Theme Configuration -->
+    <style name="AppTheme" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- Primary Brand Colors -->
+        <item name="colorPrimary">#38BDF8</item>
+        <item name="colorPrimaryVariant">#0284C7</item>
+        <item name="colorOnPrimary">#0F172A</item>
+
+        <!-- Dark Background & Surface Colors -->
+        <item name="android:colorBackground">#0F172A</item>
+        <item name="colorSurface">#1E293B</item>
+        <item name="colorOnBackground">#FFFFFF</item>
+        <item name="colorOnSurface">#FFFFFF</item>
+        <item name="android:statusBarColor">#0F172A</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>
