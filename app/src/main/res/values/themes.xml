@@ -1,10 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Light Mode Theme Configuration -->
     <style name="AppTheme" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- Primary Brand Colors -->
         <item name="colorPrimary">#38BDF8</item>
-        <item name="colorPrimaryDark">#0F172A</item>
-        <item name="colorAccent">#38BDF8</item>
-        <item name="android:windowBackground">#0F172A</item>
-        <item name="android:statusBarColor">#0F172A</item>
+        <item name="colorPrimaryVariant">#0284C7</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        
+        <!-- Light Background & Surface Colors -->
+        <item name="android:colorBackground">#F1F5F9</item>
+        <item name="colorSurface">#FFFFFF</item>
+        <item name="colorOnBackground">#0F172A</item>
+        <item name="colorOnSurface">#0F172A</item>
+        <item name="android:statusBarColor">#F1F5F9</item>
+        <item name="android:windowLightStatusBar">true</item>
     </style>
 </resources>
