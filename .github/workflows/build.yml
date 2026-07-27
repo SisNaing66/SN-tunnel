@@ -22,12 +22,12 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-
+          
       - name: Validate or Generate Gradle Wrapper
         run: |
           if [ ! -f "./gradlew" ]; then
-            echo "gradlew not found. Generating wrapper..."
-            gradle wrapper
+            echo "gradlew not found. Generating Gradle 8.5 wrapper..."
+            gradle wrapper --gradle-version 8.5
           fi
 
       - name: Setup Gradle
