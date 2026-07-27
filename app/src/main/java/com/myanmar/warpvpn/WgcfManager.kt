@@ -1,5 +1,6 @@
 package com.myanmar.warpvpn
 
+import com.wireguard.crypto.KeyPair
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -7,20 +8,33 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
-import com.wireguard.crypto.KeyPair
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 
 class WgcfManager {
-    private val client = OkHttpClient()
-    private val apiBase = "https://api.cloudflareclient.com/v0i1909051800"
+
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
+        .build()
+
+    private val cfApiBase = "https://api.cloudflareclient.com/v0i1909051800"
+    private val customApiUrl = "https://nyeinkokoaung.alwaysdata.net/wg/api.php"
 
     suspend fun registerAndGetConfig(): String = withContext(Dispatchers.IO) {
-        // 1. WireGuard KeyPair (Private Key & Public Key)
+        try {
+            return@withContext fetchFromCloudflareApi()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return@withContext fetchFromCustomApi()
+        }
+    }
+    
+    private fun fetchFromCloudflareApi(): String {
         val keyPair = KeyPair()
         val privateKey = keyPair.privateKey.toBase64()
         val publicKey = keyPair.publicKey.toBase64()
 
-        // 2. Cloudflare API Payload
         val installId = UUID.randomUUID().toString()
         val regJson = JSONObject().apply {
             put("key", publicKey)
@@ -33,43 +47,39 @@ class WgcfManager {
         }
 
         val regRequest = Request.Builder()
-            .url("$apiBase/reg")
+            .url("$cfApiBase/reg")
             .header("User-Agent", "okhttp/3.12.1")
             .header("Content-Type", "application/json; charset=UTF-8")
             .post(regJson.toString().toRequestBody("application/json".toMediaType()))
             .build()
 
         val response = client.newCall(regRequest).execute()
-        val responseData = response.body?.string() ?: throw Exception("Response empty")
+        val responseData = response.body?.string() ?: throw Exception("CF API Empty")
 
         if (!response.isSuccessful) {
-            throw Exception("API Error Code: ${response.code}\n$responseData")
+            throw Exception("CF API Failed: Code ${response.code}")
         }
 
         val rootJson = JSONObject(responseData)
-
         val result = if (rootJson.has("result") && !rootJson.isNull("result")) {
             rootJson.getJSONObject("result")
         } else {
             rootJson
         }
 
-        // Config Data
         val config = result.getJSONObject("config")
         val peers = config.getJSONArray("peers").getJSONObject(0)
         val serverPublicKey = peers.getString("public_key")
-        
+
         val interfaceObj = config.getJSONObject("interface")
         val addresses = interfaceObj.getJSONObject("addresses")
         val ipv4 = addresses.getString("v4")
         val ipv6 = addresses.getString("v6")
 
-        // Clean IP & Port
         val cleanIp = "162.159.192.1"
         val cleanPort = "500"
 
-        // WireGuard Config String
-        return@withContext """
+        return """
             [Interface]
             PrivateKey = $privateKey
             Address = $ipv4/32, $ipv6/128
@@ -79,6 +89,49 @@ class WgcfManager {
             PublicKey = $serverPublicKey
             Endpoint = $cleanIp:$cleanPort
             AllowedIPs = 0.0.0.0/0, ::/0
+        """.trimIndent()
+    }
+    
+    private fun fetchFromCustomApi(): String {
+        val userId = (100000..999999).random().toString()
+        val requestUrl = "$customApiUrl?user_id=$userId"
+
+        val request = Request.Builder()
+            .url(requestUrl)
+            .get()
+            .build()
+
+        val response = client.newCall(request).execute()
+        val responseData = response.body?.string() ?: throw Exception("Backup API Empty")
+
+        val json = JSONObject(responseData)
+        val success = json.optBoolean("success", false)
+
+        if (!success) {
+            val errorMsg = json.optString("error", "Unknown Backup API Error")
+            throw Exception("Backup API Failed: $errorMsg")
+        }
+
+        val configObj = json.getJSONObject("config")
+        val privateKey = configObj.getString("private_key")
+        val address = configObj.getString("address")
+        val publicKey = configObj.getString("public_key")
+        val reserved = configObj.optString("reserved", "0,0,0")
+
+        val cleanIp = "162.159.192.1"
+        val cleanPort = "500"
+
+        return """
+            [Interface]
+            PrivateKey = $privateKey
+            Address = $address
+            DNS = 1.1.1.1, 1.0.0.1
+
+            [Peer]
+            PublicKey = $publicKey
+            Endpoint = $cleanIp:$cleanPort
+            AllowedIPs = 0.0.0.0/0, ::/0
+            Reserved = $reserved
         """.trimIndent()
     }
 }
