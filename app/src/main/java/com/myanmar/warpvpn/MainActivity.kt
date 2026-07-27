@@ -18,6 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayInputStream
+import java.net.InetAddress
 
 class MainActivity : AppCompatActivity() {
 
@@ -28,8 +29,8 @@ class MainActivity : AppCompatActivity() {
 
     private var isConnected = false
     private val backend by lazy { GoBackend(applicationContext) }
+    private val tunnel = WgTunnel()
 
-    // Android VPN Permission Request Handler
     private val vpnPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -37,9 +38,9 @@ class MainActivity : AppCompatActivity() {
             appendLog("VPN Permission Granted!")
             connectVpn()
         } else {
-            appendLog("VPN Permission Denied by User!")
+            appendLog("VPN Permission Denied!")
             resetUi()
-            Toast.makeText(this, "VPN Permission is required to connect!", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "VPN Permission is required!", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -51,7 +52,7 @@ class MainActivity : AppCompatActivity() {
         imgPower = findViewById(R.id.imgPower)
         tvStatus = findViewById(R.id.tvStatus)
         tvLogs = findViewById(R.id.tvLogs)
-        
+
         val savedConfig = getSavedConfig()
         if (savedConfig != null) {
             appendLog("Found saved WARP Config in device memory.")
@@ -73,7 +74,7 @@ class MainActivity : AppCompatActivity() {
             tvLogs.append("> $message\n")
         }
     }
-    
+
     private fun prepareAndConnectVpn() {
         tvStatus.text = "CONNECTING..."
         btnConnectCard.setStrokeColor(Color.parseColor("#F59E0B"))
@@ -87,7 +88,7 @@ class MainActivity : AppCompatActivity() {
             connectVpn()
         }
     }
-    
+
     private fun connectVpn() {
         lifecycleScope.launch(Dispatchers.IO) {
             try {
@@ -97,7 +98,6 @@ class MainActivity : AppCompatActivity() {
                     appendLog("Requesting NEW WARP Config from Cloudflare...")
                     val wgcf = WgcfManager()
                     configStr = wgcf.registerAndGetConfig()
-                    
                     saveConfig(configStr)
                     appendLog("NEW Config saved successfully!")
                 } else {
@@ -106,13 +106,8 @@ class MainActivity : AppCompatActivity() {
 
                 appendLog("Building Tunnel Session...")
                 val wgConfig = Config.parse(ByteArrayInputStream(configStr.toByteArray()))
-
-                // WireGuard Tunnel
-                backend.setState(
-                    TunnelTunnel(),
-                    com.wireguard.android.backend.Tunnel.State.UP,
-                    wgConfig
-                )
+                
+                backend.setState(tunnel, com.wireguard.android.backend.Tunnel.State.UP, wgConfig)
 
                 withContext(Dispatchers.Main) {
                     isConnected = true
@@ -120,12 +115,17 @@ class MainActivity : AppCompatActivity() {
                     tvStatus.setTextColor(Color.parseColor("#4ADE80"))
                     btnConnectCard.setStrokeColor(Color.parseColor("#4ADE80"))
                     imgPower.setColorFilter(Color.parseColor("#4ADE80"))
+                    
+                    Toast.makeText(this@MainActivity, "WARP VPN Connected Successfully!", Toast.LENGTH_SHORT).show()
                     appendLog("Connected to WARP VPN!")
                 }
+                
+                runPingTest()
 
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     appendLog("Error: ${e.localizedMessage}")
+                    Toast.makeText(this@MainActivity, "Connection Failed!", Toast.LENGTH_SHORT).show()
                     resetUi()
                 }
             }
@@ -135,20 +135,39 @@ class MainActivity : AppCompatActivity() {
     private fun disconnectVpn() {
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                backend.setState(
-                    TunnelTunnel(),
-                    com.wireguard.android.backend.Tunnel.State.DOWN,
-                    null
-                )
+                appendLog("Stopping VPN Tunnel...")
+                
+                backend.setState(tunnel, com.wireguard.android.backend.Tunnel.State.DOWN, null)
+
                 withContext(Dispatchers.Main) {
                     appendLog("Disconnected from VPN.")
+                    Toast.makeText(this@MainActivity, "WARP VPN Disconnected", Toast.LENGTH_SHORT).show()
                     resetUi()
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     appendLog("Disconnect Error: ${e.localizedMessage}")
+                    resetUi()
                 }
             }
+        }
+    }
+    
+    private suspend fun runPingTest() = withContext(Dispatchers.IO) {
+        try {
+            appendLog("Running Ping Test to 1.1.1.1...")
+            val startTime = System.currentTimeMillis()
+            val address = InetAddress.getByName("1.1.1.1")
+            val reachable = address.isReachable(3000)
+            val pingTime = System.currentTimeMillis() - startTime
+
+            if (reachable) {
+                appendLog("Ping Success: $pingTime ms (Clean IP Working)")
+            } else {
+                appendLog("Ping Test Timeout (No Response)")
+            }
+        } catch (e: Exception) {
+            appendLog("Ping Test Failed: ${e.localizedMessage}")
         }
     }
 
@@ -160,7 +179,6 @@ class MainActivity : AppCompatActivity() {
         imgPower.setColorFilter(Color.parseColor("#94A3B8"))
     }
 
-    // Local Data Storage Helper Methods
     private fun saveConfig(config: String) {
         val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
         prefs.edit().putString("WARP_CONFIG", config).apply()
@@ -171,8 +189,7 @@ class MainActivity : AppCompatActivity() {
         return prefs.getString("WARP_CONFIG", null)
     }
 
-    // Dummy Tunnel Class for WireGuard Backend
-    class TunnelTunnel : com.wireguard.android.backend.Tunnel {
+    class WgTunnel : com.wireguard.android.backend.Tunnel {
         override fun getName(): String = "WARPTunnel"
         override fun onStateChange(newState: com.wireguard.android.backend.Tunnel.State) {}
     }
