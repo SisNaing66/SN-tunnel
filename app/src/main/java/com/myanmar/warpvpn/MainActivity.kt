@@ -66,6 +66,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
+        val isDark = prefs.getBoolean("DARK_MODE", true)
+        
+        if (isDark) {
+            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+        } else {
+            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+        }
+
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
@@ -82,23 +91,14 @@ class MainActivity : AppCompatActivity() {
         switchPing = findViewById(R.id.switchPing)
         btnRestoreDefaults = findViewById(R.id.btnRestoreDefaults)
         tvTelegram = findViewById(R.id.tvTelegram)
-
-        val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
         
-        val isDark = prefs.getBoolean("DARK_MODE", true)
         switchDarkMode.isChecked = isDark
-        if (isDark) {
-            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-        } else {
-            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
-        }
-
         switchLogs.isChecked = prefs.getBoolean("SHOW_LOGS", true)
         switchPing.isChecked = prefs.getBoolean("AUTO_PING", true)
 
         cardLogs.visibility = if (switchLogs.isChecked) View.VISIBLE else View.GONE
 
-        // Dark Mode Switch
+        // Dark Mode Switch Logic
         switchDarkMode.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean("DARK_MODE", isChecked).apply()
             if (isChecked) {
@@ -108,13 +108,13 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Connection Logs Switch
+        // Connection Logs Switch Logic
         switchLogs.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean("SHOW_LOGS", isChecked).apply()
             cardLogs.visibility = if (isChecked) View.VISIBLE else View.GONE
         }
 
-        // Auto Ping Switch
+        // Auto Ping Switch Logic
         switchPing.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean("AUTO_PING", isChecked).apply()
             if (isConnected) {
@@ -122,16 +122,13 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Restore Defaults
+        // Restore Defaults Button Logic
         btnRestoreDefaults.setOnClickListener {
             prefs.edit().clear().apply()
-            Toast.makeText(this, "Defaults Restored! Re-generating config...", Toast.LENGTH_SHORT).show()
-            appendLog("Restored default settings. Saved config cleared.")
+            Toast.makeText(this, "Defaults Restored!", Toast.LENGTH_SHORT).show()
+            appendLog("Restored default settings. Memory cleared.")
             
-            switchDarkMode.isChecked = true
-            switchLogs.isChecked = true
-            switchPing.isChecked = true
-            drawerLayout.closeDrawer(GravityCompat.START)
+            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
         }
 
         btnMenu.setOnClickListener {
@@ -201,7 +198,7 @@ class MainActivity : AppCompatActivity() {
 
                     Toast.makeText(this@MainActivity, "WARP VPN Connected Successfully!", Toast.LENGTH_SHORT).show()
                     appendLog("Connected to WARP VPN!")
-                    
+
                     startPingManager()
                 }
 
@@ -236,7 +233,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // Ping Manager
     private fun startPingManager() {
         stopPingManager()
         pingJob = lifecycleScope.launch(Dispatchers.IO) {
