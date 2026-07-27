@@ -12,14 +12,19 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.switchmaterial.SwitchMaterial
 import com.wireguard.android.backend.GoBackend
 import com.wireguard.config.Config
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayInputStream
@@ -35,11 +40,15 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvLogs: TextView
     private lateinit var cardLogs: MaterialCardView
 
+    private lateinit var switchDarkMode: SwitchMaterial
     private lateinit var switchLogs: SwitchMaterial
     private lateinit var switchPing: SwitchMaterial
+    private lateinit var btnRestoreDefaults: MaterialButton
     private lateinit var tvTelegram: TextView
 
     private var isConnected = false
+    private var pingJob: Job? = null
+
     private val backend by lazy { GoBackend(applicationContext) }
     private val tunnel = WgTunnel()
 
@@ -68,30 +77,67 @@ class MainActivity : AppCompatActivity() {
         tvLogs = findViewById(R.id.tvLogs)
         cardLogs = findViewById(R.id.cardLogs)
 
+        switchDarkMode = findViewById(R.id.switchDarkMode)
         switchLogs = findViewById(R.id.switchLogs)
         switchPing = findViewById(R.id.switchPing)
+        btnRestoreDefaults = findViewById(R.id.btnRestoreDefaults)
         tvTelegram = findViewById(R.id.tvTelegram)
-        
+
         val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
+        
+        val isDark = prefs.getBoolean("DARK_MODE", true)
+        switchDarkMode.isChecked = isDark
+        if (isDark) {
+            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+        } else {
+            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+        }
+
         switchLogs.isChecked = prefs.getBoolean("SHOW_LOGS", true)
         switchPing.isChecked = prefs.getBoolean("AUTO_PING", true)
 
         cardLogs.visibility = if (switchLogs.isChecked) View.VISIBLE else View.GONE
 
-        // Switch Action Handlers
+        // Dark Mode Switch
+        switchDarkMode.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean("DARK_MODE", isChecked).apply()
+            if (isChecked) {
+                AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+            } else {
+                AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+            }
+        }
+
+        // Connection Logs Switch
         switchLogs.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean("SHOW_LOGS", isChecked).apply()
             cardLogs.visibility = if (isChecked) View.VISIBLE else View.GONE
         }
 
+        // Auto Ping Switch
         switchPing.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean("AUTO_PING", isChecked).apply()
+            if (isConnected) {
+                startPingManager()
+            }
         }
-        
+
+        // Restore Defaults
+        btnRestoreDefaults.setOnClickListener {
+            prefs.edit().clear().apply()
+            Toast.makeText(this, "Defaults Restored! Re-generating config...", Toast.LENGTH_SHORT).show()
+            appendLog("Restored default settings. Saved config cleared.")
+            
+            switchDarkMode.isChecked = true
+            switchLogs.isChecked = true
+            switchPing.isChecked = true
+            drawerLayout.closeDrawer(GravityCompat.START)
+        }
+
         btnMenu.setOnClickListener {
             drawerLayout.openDrawer(GravityCompat.START)
         }
-        
+
         tvTelegram.setOnClickListener {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/premium_channel_404"))
             startActivity(intent)
@@ -155,10 +201,8 @@ class MainActivity : AppCompatActivity() {
 
                     Toast.makeText(this@MainActivity, "WARP VPN Connected Successfully!", Toast.LENGTH_SHORT).show()
                     appendLog("Connected to WARP VPN!")
-                }
-                
-                if (switchPing.isChecked) {
-                    runPingTest()
+                    
+                    startPingManager()
                 }
 
             } catch (e: Exception) {
@@ -174,6 +218,7 @@ class MainActivity : AppCompatActivity() {
     private fun disconnectVpn() {
         lifecycleScope.launch(Dispatchers.IO) {
             try {
+                stopPingManager()
                 appendLog("Stopping VPN Tunnel...")
                 backend.setState(tunnel, com.wireguard.android.backend.Tunnel.State.DOWN, null)
 
@@ -191,25 +236,46 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private suspend fun runPingTest() = withContext(Dispatchers.IO) {
+    // Ping Manager
+    private fun startPingManager() {
+        stopPingManager()
+        pingJob = lifecycleScope.launch(Dispatchers.IO) {
+            val isAutoPing = switchPing.isChecked
+            if (isAutoPing) {
+                while (isActive && isConnected) {
+                    runSinglePing()
+                    delay(30000)
+                }
+            } else {
+                runSinglePing()
+            }
+        }
+    }
+
+    private fun stopPingManager() {
+        pingJob?.cancel()
+        pingJob = null
+    }
+
+    private suspend fun runSinglePing() = withContext(Dispatchers.IO) {
         try {
-            appendLog("Running Ping Test to 1.1.1.1...")
             val startTime = System.currentTimeMillis()
             val address = InetAddress.getByName("1.1.1.1")
             val reachable = address.isReachable(3000)
             val pingTime = System.currentTimeMillis() - startTime
 
             if (reachable) {
-                appendLog("Ping Success: $pingTime ms (Clean IP Working)")
+                appendLog("Ping (1.1.1.1): $pingTime ms")
             } else {
-                appendLog("Ping Test Timeout")
+                appendLog("Ping Timeout")
             }
         } catch (e: Exception) {
-            appendLog("Ping Test Failed: ${e.localizedMessage}")
+            appendLog("Ping Error: ${e.localizedMessage}")
         }
     }
 
     private fun resetUi() {
+        stopPingManager()
         isConnected = false
         tvStatus.text = "TAP TO CONNECT"
         tvStatus.setTextColor(Color.parseColor("#94A3B8"))
