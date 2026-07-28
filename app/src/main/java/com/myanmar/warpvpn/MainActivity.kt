@@ -84,6 +84,7 @@ class MainActivity : AppCompatActivity() {
 
     private var isConnected = false
     private var pingJob: Job? = null
+    private var pendingConfigStr: String? = null
 
     private val backend by lazy { GoBackend(applicationContext) }
     private val tunnel = WgTunnel()
@@ -93,7 +94,7 @@ class MainActivity : AppCompatActivity() {
     ) { result ->
         if (result.resultCode == RESULT_OK) {
             appendLog("VPN Permission Granted!")
-            connectVpn()
+            connectVpnWithPendingConfig()
         } else {
             appendLog("VPN Permission Denied!")
             resetUi()
@@ -472,22 +473,11 @@ class MainActivity : AppCompatActivity() {
             tvLogs.append("> $message\n")
         }
     }
-
+    
     private fun prepareAndConnectVpn() {
         tvStatus.text = "CONNECTING..."
         btnConnectCard.setStrokeColor(Color.parseColor("#F59E0B"))
 
-        val intent = VpnService.prepare(this)
-        if (intent != null) {
-            appendLog("Requesting VPN Permission...")
-            vpnPermissionLauncher.launch(intent)
-        } else {
-            appendLog("VPN Permission already granted.")
-            connectVpn()
-        }
-    }
-
-    private fun connectVpn() {
         lifecycleScope.launch(Dispatchers.IO) {
             try {
                 var selectedModel = getSelectedConfig()
@@ -510,7 +500,34 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 configStr = applyCustomDnsToConfig(configStr)
+                pendingConfigStr = configStr
+                
+                withContext(Dispatchers.Main) {
+                    val intent = VpnService.prepare(this@MainActivity)
+                    if (intent != null) {
+                        appendLog("Requesting VPN Permission...")
+                        vpnPermissionLauncher.launch(intent)
+                    } else {
+                        appendLog("VPN Permission already granted.")
+                        connectVpnWithPendingConfig()
+                    }
+                }
 
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    appendLog("Error: ${e.localizedMessage}")
+                    Toast.makeText(this@MainActivity, "Connection Failed!", Toast.LENGTH_SHORT).show()
+                    resetUi()
+                }
+            }
+        }
+    }
+
+    private fun connectVpnWithPendingConfig() {
+        val configStr = pendingConfigStr ?: return
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
                 appendLog("Building Tunnel Session...")
                 val wgConfig = Config.parse(ByteArrayInputStream(configStr.toByteArray()))
 
