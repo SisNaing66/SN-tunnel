@@ -1,37 +1,6 @@
-import java.net.URL
-import java.io.File
-
 plugins {
     id("com.android.application") version "8.2.2"
     id("org.jetbrains.kotlin.android") version "1.9.22"
-}
-
-// Build မစမီ libv2ray.aar ကို GitHub Release Link မှ Auto Download ဆွဲပေးမည့် Task
-tasks.register("downloadLibV2ray") {
-    doLast {
-        val libsDir = File(projectDir, "libs")
-        if (!libsDir.exists()) libsDir.mkdirs()
-
-        val aarFile = File(libsDir, "libv2ray.aar")
-        if (!aarFile.exists()) {
-            println("Downloading libv2ray.aar from GitHub Release...")
-            val downloadUrl = "https://github.com/2dust/AndroidLibXrayLite/releases/download/v26.7.19/libv2ray.aar"
-            
-            val connection = URL(downloadUrl).openConnection()
-            connection.setRequestProperty("User-Agent", "Mozilla/5.0")
-            
-            connection.getInputStream().use { input ->
-                aarFile.outputStream().use { output ->
-                    input.copyTo(output)
-                }
-            }
-            println("Download libv2ray.aar completed successfully!")
-        }
-    }
-}
-
-tasks.named("preBuild") {
-    dependsOn("downloadLibV2ray")
 }
 
 android {
@@ -45,9 +14,26 @@ android {
         versionCode = 1
         versionName = "1.0"
 
-        ndk {
-            abiFilters.addAll(setOf("arm64-v8a", "armeabi-v7a", "x86_64"))
+        val abiFilterList = (properties["ABI_FILTERS"] as? String)?.split(';')
+        splits {
+            abi {
+                isEnable = true
+                reset()
+                if (!abiFilterList.isNullOrEmpty()) {
+                    include(*abiFilterList.toTypedArray())
+                } else {
+                    include(
+                        "arm64-v8a",
+                        "armeabi-v7a",
+                        "x86_64",
+                        "x86"
+                    )
+                }
+                isUniversalApk = abiFilterList.isNullOrEmpty()
+            }
         }
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -74,7 +60,8 @@ dependencies {
     implementation("com.google.android.material:material:1.11.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     
-    implementation(files("libs/libv2ray.aar"))
+    // WireGuard Official Android SDK
+    implementation("com.wireguard.android:tunnel:1.0.20211029")
 
     // Network / Coroutines
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
