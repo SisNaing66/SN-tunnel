@@ -43,34 +43,170 @@ jobs:
         run: ./gradlew assembleDebug --no-daemon
 
       # ----------------------------------------------------
-      # 1. GitHub Releases
+      # 1. Rename APKs to WarpTunnel format
+      # ----------------------------------------------------
+      - name: Rename APKs to WarpTunnel Format
+        run: |
+          cd app/build/outputs/apk/debug/
+          
+          # Rename each APK
+          for file in *.apk; do
+            if [[ "$file" == *"arm64-v8a"* ]]; then
+              mv "$file" "WarpTunnel-arm64-v8a.apk"
+            elif [[ "$file" == *"armeabi-v7a"* ]]; then
+              mv "$file" "WarpTunnel-armeabi-v7a.apk"
+            elif [[ "$file" == *"x86_64"* ]] || [[ "$file" == *"x86-64"* ]]; then
+              mv "$file" "WarpTunnel-x86_64.apk"
+            elif [[ "$file" == *"universal"* ]]; then
+              mv "$file" "WarpTunnel-universal.apk"
+            elif [[ "$file" == *"x86"* ]] && [[ ! "$file" == *"x86_64"* ]]; then
+              mv "$file" "WarpTunnel-x86.apk"
+            else
+              # Default rename
+              mv "$file" "WarpTunnel-${file}"
+            fi
+          done
+          
+          # List renamed files
+          ls -la
+
+      # ----------------------------------------------------
+      # 2. Upload Artifacts
+      # ----------------------------------------------------
+      - name: Upload APK Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: WarpTunnel-APKs
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 30
+
+      # ----------------------------------------------------
+      # 3. Upload Individual Split APKs as Separate Artifacts
+      # ----------------------------------------------------
+      - name: Upload arm64-v8a APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: WarpTunnel-arm64-v8a
+          path: app/build/outputs/apk/debug/WarpTunnel-arm64-v8a.apk
+          retention-days: 30
+
+      - name: Upload armeabi-v7a APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: WarpTunnel-armeabi-v7a
+          path: app/build/outputs/apk/debug/WarpTunnel-armeabi-v7a.apk
+          retention-days: 30
+
+      - name: Upload x86_64 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: WarpTunnel-x86_64
+          path: app/build/outputs/apk/debug/WarpTunnel-x86_64.apk
+          retention-days: 30
+
+      - name: Upload Universal APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: WarpTunnel-universal
+          path: app/build/outputs/apk/debug/WarpTunnel-universal.apk
+          retention-days: 30
+
+      # ----------------------------------------------------
+      # 4. Upload to GitHub Releases
       # ----------------------------------------------------
       - name: Upload All Split APKs to GitHub Releases
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
           tag_name: "v1.0.0"
-          name: "1.0.0"
+          name: "🚀 WARP TUNNEL v1.0.0"
           body: |
-            ### 🚀 WARP TUNNEL Split APK Builds
-            - **arm64-v8a**: `WarpTunnel-arm64-v8a.apk`
-            - **armeabi-v7a**: `WarpTunnel-armeabi-v7a.apk`
-            - **x86_64**: `WarpTunnel-x86_64.apk`
-            - **Universal**: `WarpTunnel-universal.apk`
+            ### 🔥 WARP TUNNEL Android APK Builds
+            
+            | Architecture | Download | Size |
+            | --- | --- | --- |
+            | **ARM64-v8a** (64-bit) | [WarpTunnel-arm64-v8a.apk](https://github.com/${{ github.repository }}/releases/download/v1.0.0/WarpTunnel-arm64-v8a.apk) | ~59 MB |
+            | **ARMv7-a** (32-bit) | [WarpTunnel-armeabi-v7a.apk](https://github.com/${{ github.repository }}/releases/download/v1.0.0/WarpTunnel-armeabi-v7a.apk) | ~60 MB |
+            | **x86_64** (64-bit) | [WarpTunnel-x86_64.apk](https://github.com/${{ github.repository }}/releases/download/v1.0.0/WarpTunnel-x86_64.apk) | ~122 MB |
+            | **Universal** (All) | [WarpTunnel-universal.apk](https://github.com/${{ github.repository }}/releases/download/v1.0.0/WarpTunnel-universal.apk) | ~134 MB |
+            
+            ---
+            
+            ### 📱 Installation Instructions
+            1. Download the APK for your device architecture
+            2. Enable "Install from Unknown Sources" in Settings
+            3. Install and enjoy! 🚀
+            
+            ---
+            
+            ### ⚡ Features
+            - ✅ WireGuard-based WARP VPN
+            - ✅ Auto-config from Cloudflare API
+            - ✅ Custom DNS support (Cloudflare/Google)
+            - ✅ Dark Mode support
+            - ✅ Auto-ping monitoring
+            - ✅ Multiple server config support
+            
+            ---
+            
+            ### 📝 Changelog
+            - Initial release
+            - Fixed config parsing issues
+            - Added fallback API support
           draft: false
           prerelease: false
-          files: app/build/outputs/apk/debug/*.apk
+          files: |
+            app/build/outputs/apk/debug/WarpTunnel-*.apk
 
       # ----------------------------------------------------
-      # 2. GitHub Actions Summary
+      # 5. GitHub Actions Summary
       # ----------------------------------------------------
-      - name: Print Built APK List
+      - name: Generate APK Summary
         run: |
-          echo "### 📦 Generated APK Files" >> $GITHUB_STEP_SUMMARY
-          echo "| File Name | Size |" >> $GITHUB_STEP_SUMMARY
-          echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
-          for file in app/build/outputs/apk/debug/*.apk; do
-            filename=$(basename "$file")
-            filesize=$(du -h "$file" | cut -f1)
-            echo "| \`$filename\` | $filesize |" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 WARP TUNNEL - Built APK Files" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Architecture | File Name | Size | SHA256 |" >> $GITHUB_STEP_SUMMARY
+          echo "| --- | --- | --- | --- |" >> $GITHUB_STEP_SUMMARY
+          
+          cd app/build/outputs/apk/debug/
+          
+          for file in WarpTunnel-*.apk; do
+            if [ -f "$file" ]; then
+              filename=$(basename "$file")
+              filesize=$(du -h "$file" | cut -f1)
+              sha256=$(sha256sum "$file" | cut -d' ' -f1 | cut -c1-16)
+              
+              # Extract architecture from filename
+              if [[ "$file" == *"arm64-v8a"* ]]; then
+                arch="🟢 ARM64-v8a"
+              elif [[ "$file" == *"armeabi-v7a"* ]]; then
+                arch="🟡 ARMv7-a"
+              elif [[ "$file" == *"x86_64"* ]]; then
+                arch="🔵 x86_64"
+              elif [[ "$file" == *"universal"* ]]; then
+                arch="🟣 Universal"
+              elif [[ "$file" == *"x86"* ]]; then
+                arch="🟠 x86"
+              else
+                arch="⚪ Other"
+              fi
+              
+              echo "| $arch | \`$filename\` | $filesize | \`$sha256...\` |" >> $GITHUB_STEP_SUMMARY
+            fi
           done
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📥 Download Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All APKs are available as downloadable artifacts in this workflow run." >> $GITHUB_STEP_SUMMARY
+
+      # ----------------------------------------------------
+      # 6. Build Time and Status
+      # ----------------------------------------------------
+      - name: Build Completion Status
+        run: |
+          echo "### ✅ Build Completed Successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Time:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "**APK Count:** $(ls -1 app/build/outputs/apk/debug/WarpTunnel-*.apk 2>/dev/null | wc -l)" >> $GITHUB_STEP_SUMMARY
+          echo "**Total Size:** $(du -sh app/build/outputs/apk/debug/ | cut -f1)" >> $GITHUB_STEP_SUMMARY
