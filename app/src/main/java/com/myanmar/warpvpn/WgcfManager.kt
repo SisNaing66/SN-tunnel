@@ -29,6 +29,7 @@ class WgcfManager {
         }
     }
 
+    // --- 1. Direct Cloudflare API ---
     private fun fetchFromCloudflareApi(): String {
         val keyPair = KeyPair()
         val privateKey = keyPair.privateKey.toBase64()
@@ -74,10 +75,13 @@ class WgcfManager {
         val addresses = interfaceObj.getJSONObject("addresses")
         val ipv4 = addresses.getString("v4")
         val ipv6 = addresses.getString("v6")
+        
+        val clientId = result.optJSONObject("account")?.optString("id") ?: ""
+        val reservedStr = parseClientIdToReserved(clientId)
 
         val cleanIp = "162.159.192.1"
         val cleanPort = "500"
-
+        
         return """
             [Interface]
             PrivateKey = $privateKey
@@ -89,9 +93,11 @@ class WgcfManager {
             PublicKey = $serverPublicKey
             Endpoint = $cleanIp:$cleanPort
             AllowedIPs = 0.0.0.0/0, ::/0
+            Reserved = $reservedStr
         """.trimIndent()
     }
 
+    // --- 2. Custom Backup API ---
     private fun fetchFromCustomApi(): String {
         val userId = (100000..999999).random().toString()
         val requestUrl = "$customApiUrl?user_id=$userId"
@@ -114,17 +120,23 @@ class WgcfManager {
 
         val configObj = json.getJSONObject("config")
         val clientPrivateKey = configObj.getString("private_key").trim()
-        val fullAddress = configObj.getString("address").trim()
+        val rawAddress = configObj.getString("address").trim()
         val serverPublicKey = configObj.getString("public_key").trim()
-        val reserved = configObj.optString("reserved", "0,0,0").trim()
+        val reservedStr = configObj.optString("reserved", "0,0,0").trim()
+        
+        val formattedAddress = if (rawAddress.contains(",") && !rawAddress.contains(", ")) {
+            rawAddress.replace(",", ", ")
+        } else {
+            rawAddress
+        }
 
         val cleanIp = "162.159.192.1"
         val cleanPort = "500"
-        
+
         return """
             [Interface]
             PrivateKey = $clientPrivateKey
-            Address = $fullAddress
+            Address = $formattedAddress
             DNS = 1.1.1.1, 1.0.0.1
             MTU = 1280
 
@@ -132,6 +144,21 @@ class WgcfManager {
             PublicKey = $serverPublicKey
             Endpoint = $cleanIp:$cleanPort
             AllowedIPs = 0.0.0.0/0, ::/0
+            Reserved = $reservedStr
         """.trimIndent()
+    }
+    
+    private fun parseClientIdToReserved(clientId: String): String {
+        if (clientId.isEmpty()) return "0,0,0"
+        return try {
+            val decoded = android.util.Base64.decode(clientId, android.util.Base64.DEFAULT)
+            if (decoded.size >= 3) {
+                "${decoded[0].toInt() and 0xFF},${decoded[1].toInt() and 0xFF},${decoded[2].toInt() and 0xFF}"
+            } else {
+                "0,0,0"
+            }
+        } catch (e: Exception) {
+            "0,0,0"
+        }
     }
 }
