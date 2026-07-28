@@ -1,0 +1,61 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Background Layer with Gradient -->
+    <path android:pathData="M 0,0 H 108 V 108 H 0 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="0"
+                android:startY="0"
+                android:endX="108"
+                android:endY="108"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#FF0F172A" />
+                <item android:offset="1.0" android:color="#FF1E293B" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Outer Neon Tunnel Ring -->
+    <path
+        android:pathData="M 54,22 C 36.33,22 22,36.33 22,54 C 22,71.67 36.33,86 54,86 C 71.67,86 86,71.67 86,54"
+        android:strokeWidth="5"
+        android:strokeLineCap="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="22"
+                android:startY="22"
+                android:endX="86"
+                android:endY="86"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#FF38BDF8" />
+                <item android:offset="1.0" android:color="#FF818CF8" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Inner Warp Shield Path -->
+    <path
+        android:pathData="M 54,34 L 70,42 V 56 C 70,66.5 63.2,74.8 54,78 C 44.8,74.8 38,66.5 38,56 V 42 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="38"
+                android:startY="34"
+                android:endX="70"
+                android:endY="78"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#FF0284C7" />
+                <item android:offset="1.0" android:color="#FF4338CA" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Lightning / Thunderbolt Symbol -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 56,42 L 46,55 H 53 L 50,68 L 62,53 H 55 L 56,42 Z" />
+</vector>
