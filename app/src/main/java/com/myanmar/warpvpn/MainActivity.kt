@@ -265,7 +265,7 @@ class MainActivity : AppCompatActivity() {
             val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
             prefs.edit().putString("WARP_ENGINE", "CUSTOM_API").apply()
             setEngineSelectionUI(false)
-            appendLog("Engine set to Custom PHP Backup API")
+            appendLog("Engine set to Custom Backup API")
         }
 
         btnRestoreDefaults.setOnClickListener {
@@ -662,8 +662,8 @@ class MainActivity : AppCompatActivity() {
                     btnConnectCard.setStrokeColor(Color.parseColor("#4ADE80"))
                     imgPower.setColorFilter(Color.parseColor("#4ADE80"))
 
-                    Toast.makeText(this@MainActivity, "WARP VPN Connected Successfully!", Toast.LENGTH_SHORT).show()
-                    appendLog("✅ Connected to WARP VPN!")
+                    Toast.makeText(this@MainActivity, "WARP TUNNEL Connected Successfully!", Toast.LENGTH_SHORT).show()
+                    appendLog("✅ Connected to WARP TUNNEL!")
 
                     startPingManager()
                 }
@@ -683,12 +683,12 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch(Dispatchers.IO) {
             try {
                 stopPingManager()
-                appendLog("Stopping VPN Tunnel...")
+                appendLog("Stopping WARP Tunnel...")
                 backend.setState(tunnel, com.wireguard.android.backend.Tunnel.State.DOWN, null)
 
                 withContext(Dispatchers.Main) {
-                    appendLog("Disconnected from VPN.")
-                    Toast.makeText(this@MainActivity, "WARP VPN Disconnected", Toast.LENGTH_SHORT).show()
+                    appendLog("Disconnected from TUNNEL.")
+                    Toast.makeText(this@MainActivity, "WARP TUNNEL Disconnected", Toast.LENGTH_SHORT).show()
                     resetUi()
                 }
             } catch (e: Exception) {
