@@ -32,11 +32,32 @@ class WgcfManager {
 
     // WARP Endpoints
     private val warpEndpoints = listOf(
-        "162.159.192.1",
-        "162.159.193.1",
-        "162.159.194.1",
+        "162.159.192.3",
+        "162.159.192.4",
+        "162.159.192.5",
+        "162.159.192.6",
+        "162.159.192.7",
+        "162.159.192.8",
+        "162.159.192.4",
         "162.159.195.1",
-        "162.159.196.1"
+        "162.159.195.2",
+        "162.159.195.3",
+        "162.159.195.4",
+        "162.159.195.5",
+        "162.159.195.6",
+        "162.159.195.7",
+        "162.159.195.8",
+        "162.159.195.9",
+        "162.159.192.150",
+        "162.159.192.151",
+        "162.159.192.152",
+        "162.159.192.153",
+        "162.159.192.154",
+        "162.159.192.155",
+        "162.159.192.156",
+        "162.159.192.157",
+        "162.159.192.158",
+        "162.159.192.159"
     )
 
     private val customApiUrl = "https://nyeinkokoaung.alwaysdata.net/wg/api.php"
@@ -83,9 +104,7 @@ class WgcfManager {
         throw lastException ?: Exception("All Cloudflare API endpoints failed")
     }
 
-    /**
-     * Fetch config from specific Cloudflare API and endpoint
-     */
+    // Fetch config from specific Cloudflare API and endpoint
     private fun fetchFromCloudflareApi(apiBase: String, endpoint: String): String {
         val keyPair = KeyPair()
         val privateKey = keyPair.privateKey.toBase64()
@@ -134,7 +153,7 @@ class WgcfManager {
         val ipv4 = addresses.getString("v4")
         val ipv6 = addresses.getString("v6")
 
-        // Return as RAW WireGuard Config (not URI)
+        // Return as RAW WireGuard Config
         return buildRawWireGuardConfig(
             privateKey = privateKey,
             endpoint = endpoint,
@@ -145,9 +164,7 @@ class WgcfManager {
         )
     }
 
-    /**
-     * Fetch config from custom backup API
-     */
+    // Fetch config from custom backup API
     private fun fetchFromCustomApi(): String {
         val userId = (100000..999999).random().toString()
         val requestUrl = "$customApiUrl?user_id=$userId"
@@ -193,9 +210,7 @@ class WgcfManager {
         )
     }
 
-    /**
-     * Build RAW WireGuard Config (not URI)
-     */
+    // Build RAW WireGuard Config
     private fun buildRawWireGuardConfig(
         privateKey: String,
         endpoint: String,
@@ -225,9 +240,7 @@ class WgcfManager {
         """.trimIndent()
     }
 
-    /**
-     * Find working endpoint by testing connectivity
-     */
+    // Find working endpoint by testing connectivity
     private fun findWorkingEndpoint(): String {
         for (endpoint in warpEndpoints) {
             try {
@@ -242,9 +255,7 @@ class WgcfManager {
         return "162.159.195.1"
     }
 
-    /**
-     * Test if an endpoint is reachable
-     */
+    // Test if an endpoint is reachable
     suspend fun testEndpoint(endpoint: String, timeout: Int = 3000): Boolean = withContext(Dispatchers.IO) {
         try {
             val address = InetAddress.getByName(endpoint)
@@ -254,8 +265,6 @@ class WgcfManager {
         }
     }
 
-    /**
-     * Get all available endpoints
-     */
+    // Get all available endpoints
     fun getAllEndpoints(): List<String> = warpEndpoints
 }
