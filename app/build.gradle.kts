@@ -40,7 +40,7 @@ dependencies {
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     
     // AndroidLibXrayLite (Xray-core)
-    implementation("com.github.2dust:AndroidLibXrayLite:1.6.0")
+    implementation("com.github.2dust:AndroidLibXrayLite:v26.7.19")
 
     // Network / Coroutines
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
