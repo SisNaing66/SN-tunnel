@@ -2,7 +2,7 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
+    android:layout_height="400dp"
     android:background="?attr/colorSurface"
     android:orientation="vertical"
     android:padding="20dp">
@@ -19,7 +19,7 @@
     <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="20dp">
+        android:layout_marginBottom="16dp">
 
         <TextView
             android:layout_width="wrap_content"
@@ -30,7 +30,6 @@
             android:textSize="20sp"
             android:textStyle="bold" />
 
-        <!-- Floating Action '+' Button -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/btnAddConfig"
             android:layout_width="44dp"
@@ -52,72 +51,22 @@
         </com.google.android.material.card.MaterialCardView>
     </RelativeLayout>
 
-    <!-- Config Active Item Card -->
-    <com.google.android.material.card.MaterialCardView
+    <!-- Empty State View -->
+    <TextView
+        android:id="@+id/tvEmptyState"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        app:cardBackgroundColor="?android:attr/colorBackground"
-        app:cardCornerRadius="16dp"
-        app:strokeColor="#22C55E"
-        app:strokeWidth="2dp">
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:lineSpacingExtra="4dp"
+        android:text="No servers added yet.\nTap the + icon to import."
+        android:textColor="#94A3B8"
+        android:textSize="15sp"
+        android:visibility="gone" />
 
-        <RelativeLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:padding="16dp">
-
-            <!-- Active Checkmark Icon -->
-            <ImageView
-                android:id="@+id/imgCheck"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:layout_centerVertical="true"
-                android:src="@android:drawable/checkbox_on_background"
-                app:tint="#22C55E" />
-
-            <!-- Location Details -->
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_centerVertical="true"
-                android:layout_marginStart="12dp"
-                android:layout_toStartOf="@id/btnDeleteConfig"
-                android:layout_toEndOf="@id/imgCheck"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/tvConfigTitle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="WARP Auto Clean IP"
-                    android:textColor="?attr/colorOnBackground"
-                    android:textSize="15sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/tvConfigSubtitle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:text="162.159.192.1:500"
-                    android:textColor="#94A3B8"
-                    android:textSize="12sp" />
-            </LinearLayout>
-
-            <!-- Delete Trash Icon -->
-            <ImageView
-                android:id="@+id/btnDeleteConfig"
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:layout_alignParentEnd="true"
-                android:layout_centerVertical="true"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:clickable="true"
-                android:focusable="true"
-                android:padding="4dp"
-                android:src="@android:drawable/ic_menu_delete"
-                app:tint="#EF4444" />
-        </RelativeLayout>
-    </com.google.android.material.card.MaterialCardView>
+    <!-- Server Configs RecyclerView / List -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvConfigs"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
 
 </LinearLayout>
