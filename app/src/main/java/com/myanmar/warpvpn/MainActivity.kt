@@ -1,12 +1,16 @@
 package com.myanmar.warpvpn
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
 import android.net.VpnService
 import android.os.Bundle
+import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
@@ -18,6 +22,8 @@ import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
@@ -30,8 +36,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.net.InetAddress
+
+data class ConfigModel(val id: String, val name: String, val content: String, val endpoint: String)
 
 class MainActivity : AppCompatActivity() {
 
@@ -44,6 +54,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvStatus: TextView
     private lateinit var tvLogs: TextView
     private lateinit var cardLogs: MaterialCardView
+
+    private lateinit var btnClearLogs: ImageView
+    private lateinit var btnCopyLogs: ImageView
 
     private lateinit var switchDarkMode: SwitchMaterial
     private lateinit var switchLogs: SwitchMaterial
@@ -93,6 +106,9 @@ class MainActivity : AppCompatActivity() {
         tvLogs = findViewById(R.id.tvLogs)
         cardLogs = findViewById(R.id.cardLogs)
 
+        btnClearLogs = findViewById(R.id.btnClearLogs)
+        btnCopyLogs = findViewById(R.id.btnCopyLogs)
+
         switchDarkMode = findViewById(R.id.switchDarkMode)
         switchLogs = findViewById(R.id.switchLogs)
         switchPing = findViewById(R.id.switchPing)
@@ -104,7 +120,20 @@ class MainActivity : AppCompatActivity() {
         switchPing.isChecked = prefs.getBoolean("AUTO_PING", true)
 
         cardLogs.visibility = if (switchLogs.isChecked) View.VISIBLE else View.GONE
-        
+
+        // --- Logs Copy & Clear Events ---
+        btnClearLogs.setOnClickListener {
+            tvLogs.text = "> Logs cleared.\n"
+            Toast.makeText(this, "Logs Cleared", Toast.LENGTH_SHORT).show()
+        }
+
+        btnCopyLogs.setOnClickListener {
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clip = ClipData.newPlainText("Connection Logs", tvLogs.text.toString())
+            clipboard.setPrimaryClip(clip)
+            Toast.makeText(this, "Logs Copied to Clipboard!", Toast.LENGTH_SHORT).show()
+        }
+
         cardServer.setOnClickListener {
             showSelectLocationBottomSheet()
         }
@@ -133,7 +162,7 @@ class MainActivity : AppCompatActivity() {
         btnRestoreDefaults.setOnClickListener {
             prefs.edit().clear().apply()
             Toast.makeText(this, "Defaults Restored!", Toast.LENGTH_SHORT).show()
-            appendLog("Restored default settings. Saved Config cleared.")
+            appendLog("Restored default settings. Saved Configs cleared.")
             AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
         }
 
@@ -153,41 +182,57 @@ class MainActivity : AppCompatActivity() {
                 disconnectVpn()
             }
         }
+
+        updateActiveServerName()
     }
 
-    // --- Bottom Sheet Display (Select Location & Delete & Import) ---
+    private fun updateActiveServerName() {
+        val configs = getAllConfigs()
+        if (configs.isNotEmpty()) {
+            tvServerName.text = "${configs[0].name} [${configs[0].endpoint}]"
+        } else {
+            tvServerName.text = "WARP Auto Clean IP [Auto]"
+        }
+    }
+
+    // --- Bottom Sheet Display (Config List & Empty State) ---
     private fun showSelectLocationBottomSheet() {
         val bottomSheet = BottomSheetDialog(this)
         val dialogView = layoutInflater.inflate(R.layout.dialog_select_location, null)
         bottomSheet.setContentView(dialogView)
 
         val btnAddConfig = dialogView.findViewById<MaterialCardView>(R.id.btnAddConfig)
-        val btnDeleteConfig = dialogView.findViewById<ImageView>(R.id.btnDeleteConfig)
-        val tvConfigTitle = dialogView.findViewById<TextView>(R.id.tvConfigTitle)
-        val tvConfigSubtitle = dialogView.findViewById<TextView>(R.id.tvConfigSubtitle)
+        val tvEmptyState = dialogView.findViewById<TextView>(R.id.tvEmptyState)
+        val rvConfigs = dialogView.findViewById<RecyclerView>(R.id.rvConfigs)
 
-        val savedConfig = getSavedConfig()
-        if (savedConfig != null) {
-            tvConfigTitle.text = "WARP Custom / Saved Config"
-            tvConfigSubtitle.text = "Saved WireGuard Config Active"
-        } else {
-            tvConfigTitle.text = "WARP Auto Clean IP"
-            tvConfigSubtitle.text = "162.159.192.1:500"
-        }
+        rvConfigs.layoutManager = LinearLayoutManager(this)
 
-        // Delete Config Event
-        btnDeleteConfig.setOnClickListener {
-            if (isConnected) {
-                Toast.makeText(this, "Please disconnect VPN first!", Toast.LENGTH_SHORT).show()
+        fun refreshList() {
+            val configList = getAllConfigs()
+            if (configList.isEmpty()) {
+                tvEmptyState.visibility = View.VISIBLE
+                rvConfigs.visibility = View.GONE
             } else {
-                deleteSavedConfig()
-                appendLog("Config Deleted. Will generate new config on next connect.")
-                Toast.makeText(this, "Config Deleted!", Toast.LENGTH_SHORT).show()
-                bottomSheet.dismiss()
+                tvEmptyState.visibility = View.GONE
+                rvConfigs.visibility = View.VISIBLE
+                rvConfigs.adapter = ConfigAdapter(configList, { selectedConfig ->
+                    updateActiveServerName()
+                    bottomSheet.dismiss()
+                }, { deleteConfig ->
+                    if (isConnected) {
+                        Toast.makeText(this, "Please disconnect VPN first!", Toast.LENGTH_SHORT).show()
+                    } else {
+                        deleteConfigById(deleteConfig.id)
+                        appendLog("Deleted config: ${deleteConfig.name}")
+                        refreshList()
+                        updateActiveServerName()
+                    }
+                })
             }
         }
 
-        // Add Config (+) Click Event
+        refreshList()
+
         btnAddConfig.setOnClickListener {
             bottomSheet.dismiss()
             showImportConfigDialog()
@@ -196,7 +241,7 @@ class MainActivity : AppCompatActivity() {
         bottomSheet.show()
     }
 
-    // --- Import Custom WireGuard Config Dialog (Text & wireguard:// URI) ---
+    // --- Import Custom Config Dialog ---
     private fun showImportConfigDialog() {
         val dialogView = layoutInflater.inflate(R.layout.dialog_add_server, null)
         val etConfigInput = dialogView.findViewById<EditText>(R.id.etConfigInput)
@@ -215,34 +260,41 @@ class MainActivity : AppCompatActivity() {
             if (inputText.isNotEmpty()) {
                 try {
                     val parsedConfig = if (inputText.startsWith("wireguard://", ignoreCase = true)) {
-                        // 1. wireguard:// Link Format
                         parseWireGuardUri(inputText)
                     } else {
-                        // 2. Standard [Interface] Text Format
                         inputText
                     }
-                    
+
                     Config.parse(ByteArrayInputStream(parsedConfig.toByteArray()))
-                    saveConfig(parsedConfig)
-                    appendLog("Custom WireGuard Config / URI Imported Successfully!")
+                    
+                    val name = "Imported Server #${getAllConfigs().size + 1}"
+                    val endpoint = extractEndpoint(parsedConfig)
+                    
+                    saveNewConfig(ConfigModel(System.currentTimeMillis().toString(), name, parsedConfig, endpoint))
+                    
+                    appendLog("Config Imported Successfully!")
                     Toast.makeText(this, "Config Imported Successfully!", Toast.LENGTH_SHORT).show()
+                    updateActiveServerName()
                     dialog.dismiss()
 
                 } catch (e: Exception) {
-                    e.printStackTrace()
-                    Toast.makeText(this, "Invalid WireGuard Format or URI Link!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Invalid WireGuard Config Format!", Toast.LENGTH_SHORT).show()
                 }
             } else {
-                Toast.makeText(this, "Please paste valid Config Text or wireguard:// Link!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Please paste valid Config!", Toast.LENGTH_SHORT).show()
             }
         }
 
         dialog.show()
     }
-    
+
+    private fun extractEndpoint(configStr: String): String {
+        val match = Regex("Endpoint\\s*=\\s*(\\S+)").find(configStr)
+        return match?.groupValues?.get(1) ?: "162.159.192.1:500"
+    }
+
     private fun parseWireGuardUri(uriString: String): String {
         val uri = Uri.parse(uriString)
-
         val privateKey = Uri.decode(uri.userInfo ?: throw Exception("Missing PrivateKey"))
         val host = uri.host ?: throw Exception("Missing Endpoint Host")
         val port = if (uri.port != -1) uri.port else 500
@@ -251,10 +303,6 @@ class MainActivity : AppCompatActivity() {
         val address = Uri.decode(uri.getQueryParameter("address") ?: "")
         val publicKey = Uri.decode(uri.getQueryParameter("publickey") ?: "")
         val mtu = uri.getQueryParameter("mtu") ?: "1280"
-
-        if (address.isEmpty() || publicKey.isEmpty()) {
-            throw Exception("Missing address or publickey in URI")
-        }
 
         return """
             [Interface]
@@ -293,16 +341,20 @@ class MainActivity : AppCompatActivity() {
     private fun connectVpn() {
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                var configStr = getSavedConfig()
+                val activeConfigs = getAllConfigs()
+                var configStr: String
 
-                if (configStr == null) {
-                    appendLog("Requesting NEW WARP Config...")
+                if (activeConfigs.isEmpty()) {
+                    appendLog("No config found. Requesting NEW WARP Config...")
                     val wgcf = WgcfManager()
                     configStr = wgcf.registerAndGetConfig()
-                    saveConfig(configStr)
-                    appendLog("NEW Config saved successfully!")
+                    
+                    val newModel = ConfigModel("warp_default", "WARP Auto Clean IP", configStr, extractEndpoint(configStr))
+                    saveNewConfig(newModel)
+                    appendLog("NEW WARP Config saved!")
                 } else {
-                    appendLog("Using SAVED WARP Config...")
+                    configStr = activeConfigs[0].content
+                    appendLog("Using Active Config [${activeConfigs[0].name}]...")
                 }
 
                 appendLog("Building Tunnel Session...")
@@ -400,19 +452,75 @@ class MainActivity : AppCompatActivity() {
         imgPower.setColorFilter(Color.parseColor("#94A3B8"))
     }
 
-    private fun saveConfig(config: String) {
+    // --- Multi Config Data Manager ---
+    private fun getAllConfigs(): List<ConfigModel> {
         val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
-        prefs.edit().putString("WARP_CONFIG", config).apply()
+        val jsonStr = prefs.getString("CONFIG_LIST_JSON", "[]")
+        val list = mutableListOf<ConfigModel>()
+        try {
+            val array = JSONArray(jsonStr)
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                list.add(ConfigModel(obj.getString("id"), obj.getString("name"), obj.getString("content"), obj.getString("endpoint")))
+            }
+        } catch (e: Exception) { e.printStackTrace() }
+        return list
     }
 
-    private fun getSavedConfig(): String? {
-        val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
-        return prefs.getString("WARP_CONFIG", null)
+    private fun saveNewConfig(model: ConfigModel) {
+        val list = getAllConfigs().toMutableList()
+        list.add(0, model) // Add to top
+        saveConfigList(list)
     }
 
-    private fun deleteSavedConfig() {
+    private fun deleteConfigById(id: String) {
+        val list = getAllConfigs().filter { it.id != id }
+        saveConfigList(list)
+    }
+
+    private fun saveConfigList(list: List<ConfigModel>) {
+        val array = JSONArray()
+        list.forEach {
+            val obj = JSONObject()
+            obj.put("id", it.id)
+            obj.put("name", it.name)
+            obj.put("content", it.content)
+            obj.put("endpoint", it.endpoint)
+            array.put(obj)
+        }
         val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
-        prefs.edit().remove("WARP_CONFIG").apply()
+        prefs.edit().putString("CONFIG_LIST_JSON", array.toString()).apply()
+    }
+
+    // --- RecyclerView Adapter ---
+    class ConfigAdapter(
+        private val list: List<ConfigModel>,
+        private val onItemClick: (ConfigModel) -> Unit,
+        private val onDeleteClick: (ConfigModel) -> Unit
+    ) : RecyclerView.Adapter<ConfigAdapter.ViewHolder>() {
+
+        class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+            val tvName: TextView = view.findViewById(R.id.tvName)
+            val tvEndpoint: TextView = view.findViewById(R.id.tvEndpoint)
+            val btnDelete: ImageView = view.findViewById(R.id.btnDelete)
+            val cardItem: View = view.findViewById(R.id.cardItem)
+        }
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+            val view = LayoutInflater.from(parent.context).inflate(R.layout.item_config, parent, false)
+            return ViewHolder(view)
+        }
+
+        override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+            val item = list[position]
+            holder.tvName.text = item.name
+            holder.tvEndpoint.text = item.endpoint
+
+            holder.cardItem.setOnClickListener { onItemClick(item) }
+            holder.btnDelete.setOnClickListener { onDeleteClick(item) }
+        }
+
+        override fun getItemCount(): Int = list.size
     }
 
     class WgTunnel : com.wireguard.android.backend.Tunnel {
