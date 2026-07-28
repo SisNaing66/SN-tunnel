@@ -32,7 +32,7 @@ class WgcfManager {
     private fun fetchFromCloudflareApi(): String {
         val installId = UUID.randomUUID().toString()
         val privateKey = generateRandomPrivateKey()
-        val publicKey = getPublicKeyFromPrivate(privateKey)
+        val publicKey = privateKey
 
         val regJson = JSONObject().apply {
             put("key", publicKey)
@@ -123,7 +123,7 @@ class WgcfManager {
             reserved = reservedList
         )
     }
-    
+
     private fun buildXrayJson(
         privateKey: String,
         ipv4: String,
@@ -143,20 +143,21 @@ class WgcfManager {
         }
 
         val xrayConfig = JSONObject().apply {
-            put("log", JSONObject().put("loglevel", "warning"))
-            
+            put("log", JSONObject().put("loglevel", "none"))
+
             put("inbounds", JSONArray().put(JSONObject().apply {
-                put("tag", "tun-in")
+                put("tag", "proxy")
                 put("port", 10808)
-                put("protocol", "dokodemo-door")
+                put("listen", "127.0.0.1")
+                put("protocol", "socks")
                 put("settings", JSONObject().apply {
-                    put("network", "tcp,udp")
-                    put("followRedirect", true)
+                    put("auth", "noauth")
+                    put("udp", true)
                 })
             }))
-            
+
             put("outbounds", JSONArray().put(JSONObject().apply {
-                put("tag", "proxy")
+                put("tag", "outbound")
                 put("protocol", "wireguard")
                 put("settings", JSONObject().apply {
                     put("secretKey", privateKey)
@@ -171,16 +172,12 @@ class WgcfManager {
             }))
         }
 
-        return xrayConfig.toString(2)
+        return xrayConfig.toString()
     }
 
     private fun generateRandomPrivateKey(): String {
         val bytes = ByteArray(32)
         java.security.SecureRandom().nextBytes(bytes)
         return android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
-    }
-
-    private fun getPublicKeyFromPrivate(privateKey: String): String {
-        return privateKey 
     }
 }
