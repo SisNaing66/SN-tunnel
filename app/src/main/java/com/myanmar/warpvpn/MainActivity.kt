@@ -569,15 +569,20 @@ class MainActivity : AppCompatActivity() {
         val intent = Intent(this, XrayVpnService::class.java).apply {
             putExtra("XRAY_CONFIG", configJson)
         }
-        startService(intent)
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
+        }
 
         isConnected = true
-        tvStatus.text = "CONNECTED (XRAY)"
+        tvStatus.text = "CONNECTED"
         tvStatus.setTextColor(Color.parseColor("#4ADE80"))
         btnConnectCard.setStrokeColor(Color.parseColor("#4ADE80"))
         imgPower.setColorFilter(Color.parseColor("#4ADE80"))
 
-        Toast.makeText(this, "WARP VPN Connected (Xray-core)!", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "WARP VPN Connected!", Toast.LENGTH_SHORT).show()
         appendLog("Connected to WARP VPN via Xray-core Engine!")
 
         startPingManager()
