@@ -29,7 +29,6 @@ class WgcfManager {
         }
     }
 
-    // --- 1. Direct Cloudflare API ---
     private fun fetchFromCloudflareApi(): String {
         val keyPair = KeyPair()
         val privateKey = keyPair.privateKey.toBase64()
@@ -84,6 +83,7 @@ class WgcfManager {
             PrivateKey = $privateKey
             Address = $ipv4/32, $ipv6/128
             DNS = 1.1.1.1, 1.0.0.1
+            MTU = 1280
 
             [Peer]
             PublicKey = $serverPublicKey
@@ -92,7 +92,6 @@ class WgcfManager {
         """.trimIndent()
     }
 
-    // --- 2. Custom PHP Backup API ---
     private fun fetchFromCustomApi(): String {
         val userId = (100000..999999).random().toString()
         val requestUrl = "$customApiUrl?user_id=$userId"
@@ -115,9 +114,9 @@ class WgcfManager {
 
         val configObj = json.getJSONObject("config")
         val clientPrivateKey = configObj.getString("private_key").trim()
-        val clientAddress = configObj.getString("address").trim()
-        
+        val fullAddress = configObj.getString("address").trim()
         val serverPublicKey = configObj.getString("public_key").trim()
+        val reserved = configObj.optString("reserved", "0,0,0").trim()
 
         val cleanIp = "162.159.192.1"
         val cleanPort = "500"
@@ -125,13 +124,15 @@ class WgcfManager {
         return """
             [Interface]
             PrivateKey = $clientPrivateKey
-            Address = $clientAddress
+            Address = $fullAddress
             DNS = 1.1.1.1, 1.0.0.1
+            MTU = 1280
 
             [Peer]
             PublicKey = $serverPublicKey
             Endpoint = $cleanIp:$cleanPort
             AllowedIPs = 0.0.0.0/0, ::/0
+            Reserved = $reserved
         """.trimIndent()
     }
 }
