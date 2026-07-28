@@ -9,6 +9,9 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -22,11 +25,11 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-          
+
       - name: Validate or Generate Gradle Wrapper
         run: |
           if [ ! -f "./gradlew" ]; then
-            echo "gradlew not found. Generating Gradle 8.5 wrapper..."
+            echo "gradlew not found. Generating Gradle wrapper..."
             gradle wrapper --gradle-version 8.5
           fi
 
@@ -39,8 +42,22 @@ jobs:
       - name: Build Debug APK
         run: ./gradlew assembleDebug --no-daemon
 
-      - name: Upload APK Artifact
-        uses: actions/upload-artifact@v4
+      - name: Prepare APK Files with Architecture Names
+        run: |
+          mkdir -p output_apks
+          cp app/build/outputs/apk/debug/app-debug.apk output_apks/WARP-TUNNEL-Universal-arm64-v8a-armeabi-v7a-x86_64-debug.apk
+
+      - name: Create Nightly Release / Upload APK Direct
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
         with:
-          name: WARP-VPN-Debug-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          tag_name: "v1.0.0-debug"
+          name: "WARP TUNNEL Debug Build (arm64-v8a / armeabi-v7a / x86_64)"
+          body: |
+            ### 🚀 WARP TUNNEL Debug APK
+            - **Supported Architectures:** `arm64-v8a`, `armeabi-v7a`, `x86_64`
+            - **Engine:** Xray-core (`libv2ray`)
+            - Direct `.apk` Download
+          draft: false
+          prerelease: true
+          files: output_apks/*.apk
