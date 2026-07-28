@@ -13,7 +13,7 @@
         android:orientation="vertical"
         android:padding="20dp">
 
-        <!-- Header Title -->
+        <!-- Title -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -172,6 +172,47 @@
                         android:layout_alignParentEnd="true"
                         android:checked="true" />
                 </RelativeLayout>
+
+                <!-- DNS Settings Section -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp"
+                    android:text="DNS Settings"
+                    android:textColor="#38BDF8"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <RadioGroup
+                    android:id="@+id/rgDns"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp">
+
+                    <RadioButton
+                        android:id="@+id/rbDnsDefault"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Default (Auto)"
+                        android:textColor="?attr/colorOnBackground"
+                        android:textSize="13sp" />
+
+                    <RadioButton
+                        android:id="@+id/rbDnsCloudflare"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Cloudflare DNS (1.1.1.1)"
+                        android:textColor="?attr/colorOnBackground"
+                        android:textSize="13sp" />
+
+                    <RadioButton
+                        android:id="@+id/rbDnsGoogle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Google DNS (8.8.8.8)"
+                        android:textColor="?attr/colorOnBackground"
+                        android:textSize="13sp" />
+                </RadioGroup>
 
                 <!-- Restore Defaults Button -->
                 <com.google.android.material.button.MaterialButton
