@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android APKs
 
 on:
   push:
@@ -8,9 +8,6 @@ on:
     branches:
       - main
   workflow_dispatch:
-
-permissions:
-  contents: write
 
 jobs:
   build:
@@ -39,25 +36,38 @@ jobs:
       - name: Grant Execute Permission for Gradle Wrapper
         run: chmod +x ./gradlew
 
-      - name: Build Debug APK
+      - name: Build Debug APKs
         run: ./gradlew assembleDebug --no-daemon
 
-      - name: Prepare APK Files with Architecture Names
-        run: |
-          mkdir -p output_apks
-          cp app/build/outputs/apk/debug/app-debug.apk output_apks/WARP-TUNNEL-Universal-arm64-v8a-armeabi-v7a-x86_64-debug.apk
-
-      - name: Create Nightly Release / Upload APK Direct
+      # ----------------------------------------------------
+      # 1. GitHub Releases
+      # ----------------------------------------------------
+      - name: Upload All Split APKs to GitHub Releases
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: "v1.0.0-debug"
-          name: "WARP TUNNEL Debug Build (arm64-v8a / armeabi-v7a / x86_64)"
+          tag_name: "v1.0.0-builds"
+          name: "WARP TUNNEL Builds"
           body: |
-            ### 🚀 WARP TUNNEL Debug APK
-            - **Supported Architectures:** `arm64-v8a`, `armeabi-v7a`, `x86_64`
-            - **Engine:** Xray-core (`libv2ray`)
-            - Direct `.apk` Download
+            ### 🚀 WARP TUNNEL Split APK Builds
+            - **arm64-v8a**: `app-arm64-v8a.apk`
+            - **armeabi-v7a**: `app-armeabi-v7a.apk`
+            - **x86_64**: `app-x86_64.apk`
+            - **Universal**: `app-universal.apk`
           draft: false
-          prerelease: true
-          files: output_apks/*.apk
+          prerelease: false
+          files: app/build/outputs/apk/debug/*.apk
+
+      # ----------------------------------------------------
+      # 2. GitHub Actions Summary
+      # ----------------------------------------------------
+      - name: Print Built APK List
+        run: |
+          echo "### 📦 Generated APK Files" >> $GITHUB_STEP_SUMMARY
+          echo "| File Name | Size |" >> $GITHUB_STEP_SUMMARY
+          echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
+          for file in app/build/outputs/apk/debug/*.apk; do
+            filename=$(basename "$file")
+            filesize=$(du -h "$file" | cut -f1)
+            echo "| \`$filename\` | $filesize |" >> $GITHUB_STEP_SUMMARY
+          done
