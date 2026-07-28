@@ -8,6 +8,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.net.URLEncoder
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
@@ -29,7 +30,6 @@ class WgcfManager {
         }
     }
 
-    // --- 1. Direct Cloudflare API ---
     private fun fetchFromCloudflareApi(): String {
         val keyPair = KeyPair()
         val privateKey = keyPair.privateKey.toBase64()
@@ -75,29 +75,17 @@ class WgcfManager {
         val addresses = interfaceObj.getJSONObject("addresses")
         val ipv4 = addresses.getString("v4")
         val ipv6 = addresses.getString("v6")
-        
-        val clientId = result.optJSONObject("account")?.optString("id") ?: ""
-        val reservedStr = parseClientIdToReserved(clientId)
 
         val cleanIp = "162.159.192.1"
         val cleanPort = "500"
         
-        return """
-            [Interface]
-            PrivateKey = $privateKey
-            Address = $ipv4/32, $ipv6/128
-            DNS = 1.1.1.1, 1.0.0.1
-            MTU = 1280
+        val encodedPrivateKey = URLEncoder.encode(privateKey, "UTF-8")
+        val encodedAddress = URLEncoder.encode("$ipv4/32, $ipv6/128", "UTF-8")
+        val encodedPublicKey = URLEncoder.encode(serverPublicKey, "UTF-8")
 
-            [Peer]
-            PublicKey = $serverPublicKey
-            Endpoint = $cleanIp:$cleanPort
-            AllowedIPs = 0.0.0.0/0, ::/0
-            Reserved = $reservedStr
-        """.trimIndent()
+        return "wireguard://$encodedPrivateKey@$cleanIp:$cleanPort?address=$encodedAddress&publickey=$encodedPublicKey&reserved=0%2C0%2C0&mtu=1280#WARP-AUTO"
     }
 
-    // --- 2. Custom Backup API ---
     private fun fetchFromCustomApi(): String {
         val userId = (100000..999999).random().toString()
         val requestUrl = "$customApiUrl?user_id=$userId"
@@ -123,7 +111,7 @@ class WgcfManager {
         val rawAddress = configObj.getString("address").trim()
         val serverPublicKey = configObj.getString("public_key").trim()
         val reservedStr = configObj.optString("reserved", "0,0,0").trim()
-        
+
         val formattedAddress = if (rawAddress.contains(",") && !rawAddress.contains(", ")) {
             rawAddress.replace(",", ", ")
         } else {
@@ -133,32 +121,11 @@ class WgcfManager {
         val cleanIp = "162.159.192.1"
         val cleanPort = "500"
 
-        return """
-            [Interface]
-            PrivateKey = $clientPrivateKey
-            Address = $formattedAddress
-            DNS = 1.1.1.1, 1.0.0.1
-            MTU = 1280
+        val encodedPrivateKey = URLEncoder.encode(clientPrivateKey, "UTF-8")
+        val encodedAddress = URLEncoder.encode(formattedAddress, "UTF-8")
+        val encodedPublicKey = URLEncoder.encode(serverPublicKey, "UTF-8")
+        val encodedReserved = URLEncoder.encode(reservedStr, "UTF-8")
 
-            [Peer]
-            PublicKey = $serverPublicKey
-            Endpoint = $cleanIp:$cleanPort
-            AllowedIPs = 0.0.0.0/0, ::/0
-            Reserved = $reservedStr
-        """.trimIndent()
-    }
-    
-    private fun parseClientIdToReserved(clientId: String): String {
-        if (clientId.isEmpty()) return "0,0,0"
-        return try {
-            val decoded = android.util.Base64.decode(clientId, android.util.Base64.DEFAULT)
-            if (decoded.size >= 3) {
-                "${decoded[0].toInt() and 0xFF},${decoded[1].toInt() and 0xFF},${decoded[2].toInt() and 0xFF}"
-            } else {
-                "0,0,0"
-            }
-        } catch (e: Exception) {
-            "0,0,0"
-        }
+        return "wireguard://$encodedPrivateKey@$cleanIp:$cleanPort?address=$encodedAddress&publickey=$encodedPublicKey&reserved=$encodedReserved&mtu=1280#WARP-AUTO"
     }
 }
