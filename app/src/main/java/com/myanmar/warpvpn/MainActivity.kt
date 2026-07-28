@@ -66,6 +66,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnClearLogs: ImageView
     private lateinit var btnCopyLogs: ImageView
 
+    private lateinit var cardEngineCf: MaterialCardView
+    private lateinit var rbEngineCf: RadioButton
+    private lateinit var cardEngineCustom: MaterialCardView
+    private lateinit var rbEngineCustom: RadioButton
+
     private lateinit var switchDarkMode: SwitchMaterial
     private lateinit var switchLogs: SwitchMaterial
     private lateinit var switchPing: SwitchMaterial
@@ -121,6 +126,11 @@ class MainActivity : AppCompatActivity() {
         btnClearLogs = findViewById(R.id.btnClearLogs)
         btnCopyLogs = findViewById(R.id.btnCopyLogs)
 
+        cardEngineCf = findViewById(R.id.cardEngineCf)
+        rbEngineCf = findViewById(R.id.rbEngineCf)
+        cardEngineCustom = findViewById(R.id.cardEngineCustom)
+        rbEngineCustom = findViewById(R.id.rbEngineCustom)
+
         switchDarkMode = findViewById(R.id.switchDarkMode)
         switchLogs = findViewById(R.id.switchLogs)
         switchPing = findViewById(R.id.switchPing)
@@ -137,7 +147,22 @@ class MainActivity : AppCompatActivity() {
         switchLogs.isChecked = prefs.getBoolean("SHOW_LOGS", true)
         switchPing.isChecked = prefs.getBoolean("AUTO_PING", true)
 
-        // DNS Setting Value
+        // Engine Selection UI Setup
+        val savedEngine = prefs.getString("WARP_ENGINE", "CF_DIRECT")
+        setEngineSelectionUI(savedEngine == "CF_DIRECT")
+
+        cardEngineCf.setOnClickListener {
+            prefs.edit().putString("WARP_ENGINE", "CF_DIRECT").apply()
+            setEngineSelectionUI(true)
+            appendLog("Engine set to Cloudflare Direct API")
+        }
+
+        cardEngineCustom.setOnClickListener {
+            prefs.edit().putString("WARP_ENGINE", "CUSTOM_API").apply()
+            setEngineSelectionUI(false)
+            appendLog("Engine set to Custom PHP Backup API")
+        }
+
         when (prefs.getString("DNS_SETTING", "DEFAULT")) {
             "CLOUDFLARE" -> rbDnsCloudflare.isChecked = true
             "GOOGLE" -> rbDnsGoogle.isChecked = true
@@ -146,7 +171,6 @@ class MainActivity : AppCompatActivity() {
 
         cardLogs.visibility = if (switchLogs.isChecked) View.VISIBLE else View.GONE
 
-        // DNS Radio Group Change Event
         rgDns.setOnCheckedChangeListener { _, checkedId ->
             val dnsType = when (checkedId) {
                 R.id.rbDnsCloudflare -> "CLOUDFLARE"
@@ -221,6 +245,24 @@ class MainActivity : AppCompatActivity() {
         updateActiveServerName()
     }
 
+    private fun setEngineSelectionUI(isCfDirect: Boolean) {
+        if (isCfDirect) {
+            rbEngineCf.isChecked = true
+            rbEngineCustom.isChecked = false
+            cardEngineCf.strokeColor = Color.parseColor("#38BDF8")
+            cardEngineCf.strokeWidth = 4
+            cardEngineCustom.strokeColor = Color.parseColor("#334155")
+            cardEngineCustom.strokeWidth = 2
+        } else {
+            rbEngineCf.isChecked = false
+            rbEngineCustom.isChecked = true
+            cardEngineCf.strokeColor = Color.parseColor("#334155")
+            cardEngineCf.strokeWidth = 2
+            cardEngineCustom.strokeColor = Color.parseColor("#38BDF8")
+            cardEngineCustom.strokeWidth = 4
+        }
+    }
+
     private fun updateActiveServerName() {
         val selected = getSelectedConfig()
         if (selected != null) {
@@ -230,7 +272,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // --- Bottom Sheet Display ---
     private fun showSelectLocationBottomSheet() {
         val bottomSheet = BottomSheetDialog(this)
         val dialogView = layoutInflater.inflate(R.layout.dialog_select_location, null)
@@ -277,7 +318,6 @@ class MainActivity : AppCompatActivity() {
         bottomSheet.show()
     }
 
-    // --- Import Custom Config Dialog ---
     private fun showImportConfigDialog() {
         val dialogView = layoutInflater.inflate(R.layout.dialog_add_server, null)
         val etConfigInput = dialogView.findViewById<EditText>(R.id.etConfigInput)
@@ -399,9 +439,12 @@ class MainActivity : AppCompatActivity() {
                 var configStr: String
 
                 if (selectedModel == null) {
-                    appendLog("No config found. Requesting NEW WARP Config...")
+                    val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
+                    val engineMode = prefs.getString("WARP_ENGINE", "CF_DIRECT") ?: "CF_DIRECT"
+
+                    appendLog("No config found. Requesting NEW Config via Engine: $engineMode...")
                     val wgcf = WgcfManager()
-                    configStr = wgcf.registerAndGetConfig()
+                    configStr = wgcf.registerAndGetConfig(engineMode)
 
                     val newModel = ConfigModel("warp_default", "WARP Auto Clean IP", configStr, extractEndpoint(configStr), true)
                     saveNewConfig(newModel)
@@ -410,7 +453,7 @@ class MainActivity : AppCompatActivity() {
                     configStr = selectedModel.content
                     appendLog("Using Active Config [${selectedModel.name}]...")
                 }
-                
+
                 configStr = applyCustomDnsToConfig(configStr)
 
                 appendLog("Building Tunnel Session...")
@@ -508,7 +551,6 @@ class MainActivity : AppCompatActivity() {
         imgPower.setColorFilter(Color.parseColor("#94A3B8"))
     }
 
-    // --- Multi Config Data Manager ---
     private fun getAllConfigs(): List<ConfigModel> {
         val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
         val jsonStr = prefs.getString("CONFIG_LIST_JSON", "[]")
@@ -528,7 +570,7 @@ class MainActivity : AppCompatActivity() {
                 )
             }
         } catch (e: Exception) { e.printStackTrace() }
-        
+
         if (list.isNotEmpty() && list.none { it.isSelected }) {
             list[0].isSelected = true
         }
@@ -577,7 +619,6 @@ class MainActivity : AppCompatActivity() {
         prefs.edit().putString("CONFIG_LIST_JSON", array.toString()).apply()
     }
 
-    // --- RecyclerView Adapter ---
     class ConfigAdapter(
         private val list: List<ConfigModel>,
         private val onItemClick: (ConfigModel) -> Unit,
@@ -601,7 +642,7 @@ class MainActivity : AppCompatActivity() {
             val item = list[position]
             holder.tvName.text = item.name
             holder.tvEndpoint.text = item.endpoint
-            
+
             if (item.isSelected) {
                 holder.cardItem.strokeColor = Color.parseColor("#22C55E")
                 holder.cardItem.strokeWidth = 4
