@@ -5,13 +5,14 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.net.VpnService
 import android.os.Bundle
-import android.text.TextUtils
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.Window
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.RadioButton
@@ -23,6 +24,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.lifecycle.lifecycleScope
@@ -278,11 +280,18 @@ class MainActivity : AppCompatActivity() {
         }
     }
     
+    private fun applyCustomDialogBackground(dialog: AlertDialog) {
+        dialog.window?.let { window ->
+            window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            window.setWindowAnimations(android.R.style.Animation_Dialog)
+        }
+    }
+
     private fun showRestoreDefaultsDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("Restore Defaults")
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Restore Defaults?")
             .setMessage("Are you sure you want to reset all settings, configs, and preferences to default?")
-            .setPositiveButton("OK") { dialog, _ ->
+            .setPositiveButton("OK") { d, _ ->
                 val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
                 prefs.edit().clear().apply()
                 
@@ -298,17 +307,18 @@ class MainActivity : AppCompatActivity() {
                 drawerLayout.closeDrawer(GravityCompat.START)
                 
                 AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-                dialog.dismiss()
+                d.dismiss()
             }
-            .setNegativeButton("Cancel") { dialog, _ ->
-                dialog.dismiss()
-            }
-            .show()
+            .setNegativeButton("Cancel") { d, _ -> d.dismiss() }
+            .create()
+
+        dialog.show()
+        dialog.window?.setBackgroundDrawable(ContextCompat.getDrawable(this, R.drawable.dialog_rounded_bg))
     }
     
     private fun showExitDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("Exit WARP TUNNEL")
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Exit WARP TUNNEL?")
             .setMessage("Choose whether to minimize to background or exit the app completely.")
             .setPositiveButton("Exit") { _, _ ->
                 if (isConnected) {
@@ -316,14 +326,15 @@ class MainActivity : AppCompatActivity() {
                 }
                 finishAffinity()
             }
-            .setNeutralButton("Minimize") { dialog, _ ->
-                dialog.dismiss()
+            .setNeutralButton("Minimize") { d, _ ->
+                d.dismiss()
                 moveTaskToBack(true)
             }
-            .setNegativeButton("Cancel") { dialog, _ ->
-                dialog.dismiss()
-            }
-            .show()
+            .setNegativeButton("Cancel") { d, _ -> d.dismiss() }
+            .create()
+
+        dialog.show()
+        dialog.window?.setBackgroundDrawable(ContextCompat.getDrawable(this, R.drawable.dialog_rounded_bg))
     }
 
     private fun setEngineSelectionUI(isCfDirect: Boolean) {
@@ -418,11 +429,9 @@ class MainActivity : AppCompatActivity() {
                 try {
                     var parsedConfig = inputText
                     
-                    // Check if it's a URI or raw config
                     if (inputText.startsWith("wireguard://", ignoreCase = true)) {
                         parsedConfig = parseWireGuardUri(inputText)
                     } else {
-                        // Validate raw config
                         Config.parse(ByteArrayInputStream(parsedConfig.toByteArray()))
                     }
 
@@ -448,34 +457,30 @@ class MainActivity : AppCompatActivity() {
         }
 
         dialog.show()
+        applyCustomDialogBackground(dialog)
     }
 
     private fun parseWireGuardUri(uriString: String): String {
         try {
-            // Remove "wireguard://" prefix
             val cleanUri = uriString.replace("wireguard://", "")
             
-            // Split by @ to get private key and rest
             val atIndex = cleanUri.indexOf('@')
             if (atIndex == -1) throw Exception("Missing @")
             
             val privateKey = cleanUri.substring(0, atIndex)
             val rest = cleanUri.substring(atIndex + 1)
             
-            // Split by ? to get endpoint and query
             val questionIndex = rest.indexOf('?')
             if (questionIndex == -1) throw Exception("Missing ?")
             
             val endpointPart = rest.substring(0, questionIndex)
             val queryPart = rest.substring(questionIndex + 1)
             
-            // Parse endpoint (host:port)
             val endpointParts = endpointPart.split(':')
             if (endpointParts.size != 2) throw Exception("Invalid endpoint")
             val endpointHost = endpointParts[0]
             val endpointPort = endpointParts[1]
             
-            // Parse query parameters
             val params = mutableMapOf<String, String>()
             queryPart.split('&').forEach { param ->
                 val parts = param.split('=')
@@ -490,7 +495,6 @@ class MainActivity : AppCompatActivity() {
             val publicKey = params["publickey"] ?: throw Exception("Missing publickey")
             val mtu = params["mtu"] ?: "1280"
             
-            // Build raw config
             return buildRawConfig(
                 privateKey = URLDecoder.decode(privateKey, "UTF-8"),
                 endpoint = "$endpointHost:$endpointPort",
@@ -511,7 +515,6 @@ class MainActivity : AppCompatActivity() {
         publicKey: String,
         mtu: String
     ): String {
-        // Format address
         val formattedAddress = if (address.contains(",") && !address.contains(", ")) {
             address.replace(",", ", ")
         } else {
@@ -559,7 +562,6 @@ class MainActivity : AppCompatActivity() {
             val timestamp = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
             tvLogs.append("[$timestamp] $message\n")
             
-            // Auto scroll to bottom
             tvLogs.post {
                 val scrollAmount = tvLogs.layout?.getLineTop(tvLogs.lineCount) ?: 0
                 tvLogs.scrollTo(0, maxOf(0, scrollAmount - tvLogs.height))
@@ -589,7 +591,6 @@ class MainActivity : AppCompatActivity() {
                         appendLog("Config received successfully!")
                     } catch (e: Exception) {
                         appendLog("Error: ${e.message}")
-                        // Try fallback engine
                         val fallbackEngine = if (engineMode == "CF_DIRECT") "CUSTOM_API" else "CF_DIRECT"
                         appendLog("Trying fallback engine: $fallbackEngine")
                         configStr = wgcf.registerAndGetConfig(fallbackEngine)
@@ -609,10 +610,8 @@ class MainActivity : AppCompatActivity() {
                     appendLog("Using Active Config [${selectedModel.name}]...")
                 }
 
-                // Apply custom DNS
                 configStr = applyCustomDnsToConfig(configStr)
                 
-                // Validate config before connecting
                 try {
                     Config.parse(ByteArrayInputStream(configStr.toByteArray()))
                     appendLog("✅ Config validation successful")
