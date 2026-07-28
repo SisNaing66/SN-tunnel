@@ -508,7 +508,7 @@ class MainActivity : AppCompatActivity() {
         imgPower.setColorFilter(Color.parseColor("#94A3B8"))
     }
 
-    // --- Multi Config Data Manager (With Selection State) ---
+    // --- Multi Config Data Manager ---
     private fun getAllConfigs(): List<ConfigModel> {
         val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
         val jsonStr = prefs.getString("CONFIG_LIST_JSON", "[]")
@@ -577,7 +577,7 @@ class MainActivity : AppCompatActivity() {
         prefs.edit().putString("CONFIG_LIST_JSON", array.toString()).apply()
     }
 
-    // --- RecyclerView Adapter (Highlight Active Server) ---
+    // --- RecyclerView Adapter ---
     class ConfigAdapter(
         private val list: List<ConfigModel>,
         private val onItemClick: (ConfigModel) -> Unit,
@@ -609,7 +609,7 @@ class MainActivity : AppCompatActivity() {
             } else {
                 holder.cardItem.strokeColor = Color.parseColor("#334155")
                 holder.cardItem.strokeWidth = 2
-                holder.imgCheck.visibility = View.GONE
+                holder.imgCheck.visibility = View.INVISIBLE
             }
 
             holder.cardItem.setOnClickListener { onItemClick(item) }
