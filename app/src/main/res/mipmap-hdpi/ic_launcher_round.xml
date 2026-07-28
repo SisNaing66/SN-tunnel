@@ -1,0 +1,61 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Circle Clip & Background -->
+    <path android:pathData="M 54,4 C 26.39,4 4,26.39 4,54 C 4,81.61 26.39,104 54,104 C 81.61,104 104,81.61 104,54 C 104,26.39 81.61,4 54,4 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="4"
+                android:startY="4"
+                android:endX="104"
+                android:endY="104"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#FF0F172A" />
+                <item android:offset="1.0" android:color="#FF1E293B" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Circular Glow Trail -->
+    <path
+        android:pathData="M 54,20 C 35.22,20 20,35.22 20,54 C 20,72.78 35.22,88 54,88 C 72.78,88 88,72.78 88,54"
+        android:strokeWidth="6"
+        android:strokeLineCap="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="20"
+                android:startY="20"
+                android:endX="88"
+                android:endY="88"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#FF38BDF8" />
+                <item android:offset="1.0" android:color="#FF818CF8" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Shield Core -->
+    <path
+        android:pathData="M 54,32 L 72,40 V 55 C 72,66.8 64.3,76.1 54,79.5 C 43.7,76.1 36,66.8 36,55 V 40 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="36"
+                android:startY="32"
+                android:endX="72"
+                android:endY="79.5"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#FF2563EB" />
+                <item android:offset="1.0" android:color="#FF4F46E5" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Lightning Icon -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M 56,41 L 45,55 H 53 L 49,69 L 63,53 H 55 L 56,41 Z" />
+</vector>
