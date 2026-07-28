@@ -1,12 +1,12 @@
 package com.myanmar.warpvpn
 
-import com.wireguard.crypto.KeyPair
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 import java.util.concurrent.TimeUnit
@@ -21,7 +21,7 @@ class WgcfManager {
     private val cfApiBase = "https://api.cloudflareclient.com/v0i1909051800"
     private val customApiUrl = "https://nyeinkokoaung.alwaysdata.net/wg/api.php"
 
-    suspend fun registerAndGetConfig(engineMode: String = "CF_DIRECT"): String = withContext(Dispatchers.IO) {
+    suspend fun registerAndGetXrayJson(engineMode: String = "CF_DIRECT"): String = withContext(Dispatchers.IO) {
         if (engineMode == "CUSTOM_API") {
             return@withContext fetchFromCustomApi()
         } else {
@@ -30,11 +30,10 @@ class WgcfManager {
     }
 
     private fun fetchFromCloudflareApi(): String {
-        val keyPair = KeyPair()
-        val privateKey = keyPair.privateKey.toBase64()
-        val publicKey = keyPair.publicKey.toBase64()
-
         val installId = UUID.randomUUID().toString()
+        val privateKey = generateRandomPrivateKey()
+        val publicKey = getPublicKeyFromPrivate(privateKey)
+
         val regJson = JSONObject().apply {
             put("key", publicKey)
             put("install_id", installId)
@@ -75,32 +74,20 @@ class WgcfManager {
         val ipv4 = addresses.getString("v4")
         val ipv6 = addresses.getString("v6")
 
-        val cleanIp = "162.159.192.1"
-        val cleanPort = "500"
-
-        return """
-            [Interface]
-            PrivateKey = $privateKey
-            Address = $ipv4/32, $ipv6/128
-            DNS = 1.1.1.1, 1.0.0.1
-            MTU = 1280
-
-            [Peer]
-            PublicKey = $serverPublicKey
-            Endpoint = $cleanIp:$cleanPort
-            AllowedIPs = 0.0.0.0/0, ::/0
-        """.trimIndent()
+        return buildXrayJson(
+            privateKey = privateKey,
+            ipv4 = ipv4,
+            ipv6 = ipv6,
+            serverPublicKey = serverPublicKey,
+            reserved = listOf(0, 0, 0)
+        )
     }
 
     private fun fetchFromCustomApi(): String {
         val userId = (100000..999999).random().toString()
         val requestUrl = "$customApiUrl?user_id=$userId"
 
-        val request = Request.Builder()
-            .url(requestUrl)
-            .get()
-            .build()
-
+        val request = Request.Builder().url(requestUrl).get().build()
         val response = client.newCall(request).execute()
         val responseData = response.body?.string() ?: throw Exception("Backup API Empty")
 
@@ -114,25 +101,86 @@ class WgcfManager {
 
         val configObj = json.getJSONObject("config")
         val clientPrivateKey = configObj.getString("private_key").trim()
-        val fullAddress = configObj.getString("address").trim()
+        val rawAddress = configObj.getString("address").trim()
         val serverPublicKey = configObj.getString("public_key").trim()
-        val reserved = configObj.optString("reserved", "0,0,0").trim()
+        val reservedStr = configObj.optString("reserved", "0,0,0")
 
-        val cleanIp = "162.159.192.1"
-        val cleanPort = "500"
-        
-        return """
-            [Interface]
-            PrivateKey = $clientPrivateKey
-            Address = $fullAddress
-            DNS = 1.1.1.1, 1.0.0.1
-            MTU = 1280
+        val addresses = rawAddress.split(",").map { it.trim() }
+        val ipv4 = addresses.getOrNull(0) ?: "172.16.0.2/32"
+        val ipv6 = addresses.getOrNull(1) ?: ""
 
-            [Peer]
-            PublicKey = $serverPublicKey
-            Endpoint = $cleanIp:$cleanPort
-            AllowedIPs = 0.0.0.0/0, ::/0
-            Reserved = $reserved
-        """.trimIndent()
+        val reservedList = try {
+            reservedStr.split(",").map { it.trim().toInt() }
+        } catch (e: Exception) {
+            listOf(0, 0, 0)
+        }
+
+        return buildXrayJson(
+            privateKey = clientPrivateKey,
+            ipv4 = ipv4,
+            ipv6 = ipv6,
+            serverPublicKey = serverPublicKey,
+            reserved = reservedList
+        )
+    }
+    
+    private fun buildXrayJson(
+        privateKey: String,
+        ipv4: String,
+        ipv6: String,
+        serverPublicKey: String,
+        reserved: List<Int>
+    ): String {
+        val addressArray = JSONArray().apply {
+            put(if (ipv4.contains("/")) ipv4 else "$ipv4/32")
+            if (ipv6.isNotEmpty()) {
+                put(if (ipv6.contains("/")) ipv6 else "$ipv6/128")
+            }
+        }
+
+        val reservedArray = JSONArray().apply {
+            reserved.forEach { put(it) }
+        }
+
+        val xrayConfig = JSONObject().apply {
+            put("log", JSONObject().put("loglevel", "warning"))
+            
+            put("inbounds", JSONArray().put(JSONObject().apply {
+                put("tag", "tun-in")
+                put("port", 10808)
+                put("protocol", "dokodemo-door")
+                put("settings", JSONObject().apply {
+                    put("network", "tcp,udp")
+                    put("followRedirect", true)
+                })
+            }))
+            
+            put("outbounds", JSONArray().put(JSONObject().apply {
+                put("tag", "proxy")
+                put("protocol", "wireguard")
+                put("settings", JSONObject().apply {
+                    put("secretKey", privateKey)
+                    put("address", addressArray)
+                    put("reserved", reservedArray)
+                    put("mtu", 1280)
+                    put("peers", JSONArray().put(JSONObject().apply {
+                        put("publicKey", serverPublicKey)
+                        put("endpoint", "162.159.192.1:500")
+                    }))
+                })
+            }))
+        }
+
+        return xrayConfig.toString(2)
+    }
+
+    private fun generateRandomPrivateKey(): String {
+        val bytes = ByteArray(32)
+        java.security.SecureRandom().nextBytes(bytes)
+        return android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+    }
+
+    private fun getPublicKeyFromPrivate(privateKey: String): String {
+        return privateKey 
     }
 }
