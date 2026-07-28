@@ -19,7 +19,7 @@ class WgcfManager {
         .build()
 
     private val cfApiBase = "https://api.cloudflareclient.com/v0i1909051800"
-    private val customApiUrl = "https://nyeinkokoaung.alwaysdata.net/wg/api.php"
+    private val customApiUrl = "https://iam404.serv00.net/api/wg/generate.php"
 
     suspend fun registerAndGetConfig(engineMode: String = "CF_DIRECT"): String = withContext(Dispatchers.IO) {
         if (engineMode == "CUSTOM_API") {
