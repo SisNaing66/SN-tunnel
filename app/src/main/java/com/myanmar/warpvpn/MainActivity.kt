@@ -8,6 +8,7 @@ import android.graphics.Color
 import android.net.Uri
 import android.net.VpnService
 import android.os.Bundle
+import android.text.TextUtils
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -43,6 +44,10 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.net.InetAddress
+import java.net.URLDecoder
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 data class ConfigModel(
     val id: String,
@@ -125,6 +130,7 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
+        // Initialize views
         drawerLayout = findViewById(R.id.drawerLayout)
         btnMenu = findViewById(R.id.btnMenu)
         btnConnectCard = findViewById(R.id.btnConnectCard)
@@ -155,6 +161,7 @@ class MainActivity : AppCompatActivity() {
         btnRestoreDefaults = findViewById(R.id.btnRestoreDefaults)
         tvTelegram = findViewById(R.id.tvTelegram)
 
+        // Load saved preferences
         switchDarkMode.isChecked = isDark
         switchLogs.isChecked = prefs.getBoolean("SHOW_LOGS", true)
         switchPing.isChecked = prefs.getBoolean("AUTO_PING", true)
@@ -162,27 +169,70 @@ class MainActivity : AppCompatActivity() {
         val savedEngine = prefs.getString("WARP_ENGINE", "CF_DIRECT")
         setEngineSelectionUI(savedEngine == "CF_DIRECT")
 
-        cardEngineCf.setOnClickListener {
-            prefs.edit().putString("WARP_ENGINE", "CF_DIRECT").apply()
-            setEngineSelectionUI(true)
-            appendLog("Engine set to Cloudflare Direct API")
-        }
-
-        cardEngineCustom.setOnClickListener {
-            prefs.edit().putString("WARP_ENGINE", "CUSTOM_API").apply()
-            setEngineSelectionUI(false)
-            appendLog("Engine set to Custom PHP Backup API")
-        }
-
+        // Setup click listeners
+        setupListeners()
+        
+        // Load DNS setting
         when (prefs.getString("DNS_SETTING", "DEFAULT")) {
             "CLOUDFLARE" -> rbDnsCloudflare.isChecked = true
             "GOOGLE" -> rbDnsGoogle.isChecked = true
             else -> rbDnsDefault.isChecked = true
         }
 
+        // Show/hide logs
         cardLogs.visibility = if (switchLogs.isChecked) View.VISIBLE else View.GONE
 
+        // Update UI
+        updateActiveServerName()
+        
+        // Initial log
+        appendLog("WARP VPN App Started")
+        appendLog("Ready to connect...")
+    }
+    
+    private fun setupListeners() {
+        btnMenu.setOnClickListener {
+            drawerLayout.openDrawer(GravityCompat.START)
+        }
+
+        btnConnectCard.setOnClickListener {
+            if (!isConnected) {
+                prepareAndConnectVpn()
+            } else {
+                disconnectVpn()
+            }
+        }
+
+        cardServer.setOnClickListener {
+            showSelectLocationBottomSheet()
+        }
+
+        switchDarkMode.setOnCheckedChangeListener { _, isChecked ->
+            val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
+            prefs.edit().putBoolean("DARK_MODE", isChecked).apply()
+            if (isChecked) {
+                AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+            } else {
+                AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+            }
+        }
+
+        switchLogs.setOnCheckedChangeListener { _, isChecked ->
+            val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
+            prefs.edit().putBoolean("SHOW_LOGS", isChecked).apply()
+            cardLogs.visibility = if (isChecked) View.VISIBLE else View.GONE
+        }
+
+        switchPing.setOnCheckedChangeListener { _, isChecked ->
+            val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
+            prefs.edit().putBoolean("AUTO_PING", isChecked).apply()
+            if (isConnected) {
+                startPingManager()
+            }
+        }
+
         rgDns.setOnCheckedChangeListener { _, checkedId ->
+            val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
             val dnsType = when (checkedId) {
                 R.id.rbDnsCloudflare -> "CLOUDFLARE"
                 R.id.rbDnsGoogle -> "GOOGLE"
@@ -204,53 +254,28 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Logs Copied to Clipboard!", Toast.LENGTH_SHORT).show()
         }
 
-        cardServer.setOnClickListener {
-            showSelectLocationBottomSheet()
+        cardEngineCf.setOnClickListener {
+            val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
+            prefs.edit().putString("WARP_ENGINE", "CF_DIRECT").apply()
+            setEngineSelectionUI(true)
+            appendLog("Engine set to Cloudflare Direct API")
         }
 
-        switchDarkMode.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit().putBoolean("DARK_MODE", isChecked).apply()
-            if (isChecked) {
-                AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-            } else {
-                AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
-            }
+        cardEngineCustom.setOnClickListener {
+            val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
+            prefs.edit().putString("WARP_ENGINE", "CUSTOM_API").apply()
+            setEngineSelectionUI(false)
+            appendLog("Engine set to Custom PHP Backup API")
         }
 
-        switchLogs.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit().putBoolean("SHOW_LOGS", isChecked).apply()
-            cardLogs.visibility = if (isChecked) View.VISIBLE else View.GONE
-        }
-
-        switchPing.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit().putBoolean("AUTO_PING", isChecked).apply()
-            if (isConnected) {
-                startPingManager()
-            }
-        }
-        
         btnRestoreDefaults.setOnClickListener {
             showRestoreDefaultsDialog()
-        }
-
-        btnMenu.setOnClickListener {
-            drawerLayout.openDrawer(GravityCompat.START)
         }
 
         tvTelegram.setOnClickListener {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/premium_channel_404"))
             startActivity(intent)
         }
-
-        btnConnectCard.setOnClickListener {
-            if (!isConnected) {
-                prepareAndConnectVpn()
-            } else {
-                disconnectVpn()
-            }
-        }
-
-        updateActiveServerName()
     }
     
     private fun showRestoreDefaultsDialog() {
@@ -391,13 +416,15 @@ class MainActivity : AppCompatActivity() {
 
             if (inputText.isNotEmpty()) {
                 try {
-                    val parsedConfig = if (inputText.startsWith("wireguard://", ignoreCase = true)) {
-                        parseWireGuardUri(inputText)
+                    var parsedConfig = inputText
+                    
+                    // Check if it's a URI or raw config
+                    if (inputText.startsWith("wireguard://", ignoreCase = true)) {
+                        parsedConfig = parseWireGuardUri(inputText)
                     } else {
-                        inputText
+                        // Validate raw config
+                        Config.parse(ByteArrayInputStream(parsedConfig.toByteArray()))
                     }
-
-                    Config.parse(ByteArrayInputStream(parsedConfig.toByteArray()))
 
                     val newId = System.currentTimeMillis().toString()
                     val name = "Imported Server #${getAllConfigs().size + 1}"
@@ -406,12 +433,14 @@ class MainActivity : AppCompatActivity() {
                     saveNewConfig(ConfigModel(newId, name, parsedConfig, endpoint, true))
 
                     appendLog("Config Imported Successfully!")
-                    Toast.makeText(this, "Config Imported Successfully!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, "Config Imported Successfully!", Toast.LENGTH_SHORT).show()
                     updateActiveServerName()
                     dialog.dismiss()
 
                 } catch (e: Exception) {
-                    Toast.makeText(this, "Invalid WireGuard Config Format!", Toast.LENGTH_SHORT).show()
+                    e.printStackTrace()
+                    Toast.makeText(this@MainActivity, "Invalid Config Format: ${e.message}", Toast.LENGTH_LONG).show()
+                    appendLog("Import Error: ${e.message}")
                 }
             } else {
                 Toast.makeText(this, "Please paste valid Config!", Toast.LENGTH_SHORT).show()
@@ -421,34 +450,91 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
-    private fun extractEndpoint(configStr: String): String {
-        val match = Regex("Endpoint\\s*=\\s*(\\S+)").find(configStr)
-        return match?.groupValues?.get(1) ?: "162.159.192.1:500"
+    private fun parseWireGuardUri(uriString: String): String {
+        try {
+            // Remove "wireguard://" prefix
+            val cleanUri = uriString.replace("wireguard://", "")
+            
+            // Split by @ to get private key and rest
+            val atIndex = cleanUri.indexOf('@')
+            if (atIndex == -1) throw Exception("Missing @")
+            
+            val privateKey = cleanUri.substring(0, atIndex)
+            val rest = cleanUri.substring(atIndex + 1)
+            
+            // Split by ? to get endpoint and query
+            val questionIndex = rest.indexOf('?')
+            if (questionIndex == -1) throw Exception("Missing ?")
+            
+            val endpointPart = rest.substring(0, questionIndex)
+            val queryPart = rest.substring(questionIndex + 1)
+            
+            // Parse endpoint (host:port)
+            val endpointParts = endpointPart.split(':')
+            if (endpointParts.size != 2) throw Exception("Invalid endpoint")
+            val endpointHost = endpointParts[0]
+            val endpointPort = endpointParts[1]
+            
+            // Parse query parameters
+            val params = mutableMapOf<String, String>()
+            queryPart.split('&').forEach { param ->
+                val parts = param.split('=')
+                if (parts.size == 2) {
+                    val key = parts[0]
+                    val value = URLDecoder.decode(parts[1], "UTF-8")
+                    params[key] = value
+                }
+            }
+            
+            val address = params["address"] ?: throw Exception("Missing address")
+            val publicKey = params["publickey"] ?: throw Exception("Missing publickey")
+            val mtu = params["mtu"] ?: "1280"
+            
+            // Build raw config
+            return buildRawConfig(
+                privateKey = URLDecoder.decode(privateKey, "UTF-8"),
+                endpoint = "$endpointHost:$endpointPort",
+                address = address,
+                publicKey = publicKey,
+                mtu = mtu
+            )
+            
+        } catch (e: Exception) {
+            throw Exception("Failed to parse WireGuard URI: ${e.message}")
+        }
     }
 
-    private fun parseWireGuardUri(uriString: String): String {
-        val uri = Uri.parse(uriString)
-        val privateKey = Uri.decode(uri.userInfo ?: throw Exception("Missing PrivateKey"))
-        val host = uri.host ?: throw Exception("Missing Endpoint Host")
-        val port = if (uri.port != -1) uri.port else 500
-        val endpoint = "$host:$port"
-
-        val address = Uri.decode(uri.getQueryParameter("address") ?: "")
-        val publicKey = Uri.decode(uri.getQueryParameter("publickey") ?: "")
-        val mtu = uri.getQueryParameter("mtu") ?: "1280"
-
+    private fun buildRawConfig(
+        privateKey: String,
+        endpoint: String,
+        address: String,
+        publicKey: String,
+        mtu: String
+    ): String {
+        // Format address
+        val formattedAddress = if (address.contains(",") && !address.contains(", ")) {
+            address.replace(",", ", ")
+        } else {
+            address
+        }
+        
         return """
             [Interface]
             PrivateKey = $privateKey
-            Address = $address
+            Address = $formattedAddress
             DNS = 1.1.1.1, 1.0.0.1
             MTU = $mtu
-
+            
             [Peer]
             PublicKey = $publicKey
             Endpoint = $endpoint
             AllowedIPs = 0.0.0.0/0, ::/0
         """.trimIndent()
+    }
+
+    private fun extractEndpoint(configStr: String): String {
+        val match = Regex("Endpoint\\s*=\\s*(\\S+)").find(configStr)
+        return match?.groupValues?.get(1) ?: "162.159.192.1:500"
     }
 
     private fun applyCustomDnsToConfig(rawConfig: String): String {
@@ -461,8 +547,8 @@ class MainActivity : AppCompatActivity() {
             else -> return rawConfig
         }
 
-        return if (rawConfig.contains("DNS =")) {
-            rawConfig.replace(Regex("DNS\\s*=\\s*[^\\n]+"), "DNS = $targetDns")
+        return if (rawConfig.contains("DNS =", ignoreCase = true)) {
+            rawConfig.replace(Regex("DNS\\s*=\\s*[^\\n]+", RegexOption.IGNORE_CASE), "DNS = $targetDns")
         } else {
             rawConfig.replace("[Interface]", "[Interface]\nDNS = $targetDns")
         }
@@ -470,13 +556,21 @@ class MainActivity : AppCompatActivity() {
 
     private fun appendLog(message: String) {
         runOnUiThread {
-            tvLogs.append("> $message\n")
+            val timestamp = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
+            tvLogs.append("[$timestamp] $message\n")
+            
+            // Auto scroll to bottom
+            tvLogs.post {
+                val scrollAmount = tvLogs.layout?.getLineTop(tvLogs.lineCount) ?: 0
+                tvLogs.scrollTo(0, maxOf(0, scrollAmount - tvLogs.height))
+            }
         }
     }
     
     private fun prepareAndConnectVpn() {
         tvStatus.text = "CONNECTING..."
         btnConnectCard.setStrokeColor(Color.parseColor("#F59E0B"))
+        appendLog("Preparing VPN connection...")
 
         lifecycleScope.launch(Dispatchers.IO) {
             try {
@@ -489,9 +583,25 @@ class MainActivity : AppCompatActivity() {
 
                     appendLog("No config found. Requesting NEW Config via Engine: $engineMode...")
                     val wgcf = WgcfManager()
-                    configStr = wgcf.registerAndGetConfig(engineMode)
+                    
+                    try {
+                        configStr = wgcf.registerAndGetConfig(engineMode)
+                        appendLog("Config received successfully!")
+                    } catch (e: Exception) {
+                        appendLog("Error: ${e.message}")
+                        // Try fallback engine
+                        val fallbackEngine = if (engineMode == "CF_DIRECT") "CUSTOM_API" else "CF_DIRECT"
+                        appendLog("Trying fallback engine: $fallbackEngine")
+                        configStr = wgcf.registerAndGetConfig(fallbackEngine)
+                    }
 
-                    val newModel = ConfigModel("warp_default", "WARP Auto Clean IP", configStr, extractEndpoint(configStr), true)
+                    val newModel = ConfigModel(
+                        "warp_${System.currentTimeMillis()}", 
+                        "WARP Auto Clean IP", 
+                        configStr, 
+                        extractEndpoint(configStr), 
+                        true
+                    )
                     saveNewConfig(newModel)
                     appendLog("NEW WARP Config saved!")
                 } else {
@@ -499,7 +609,18 @@ class MainActivity : AppCompatActivity() {
                     appendLog("Using Active Config [${selectedModel.name}]...")
                 }
 
+                // Apply custom DNS
                 configStr = applyCustomDnsToConfig(configStr)
+                
+                // Validate config before connecting
+                try {
+                    Config.parse(ByteArrayInputStream(configStr.toByteArray()))
+                    appendLog("✅ Config validation successful")
+                } catch (e: Exception) {
+                    appendLog("❌ Config validation failed: ${e.message}")
+                    throw Exception("Invalid config: ${e.message}")
+                }
+                
                 pendingConfigStr = configStr
                 
                 withContext(Dispatchers.Main) {
@@ -515,7 +636,8 @@ class MainActivity : AppCompatActivity() {
 
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    appendLog("Error: ${e.localizedMessage}")
+                    appendLog("Error: ${e.message}")
+                    e.printStackTrace()
                     Toast.makeText(this@MainActivity, "Connection Failed!", Toast.LENGTH_SHORT).show()
                     resetUi()
                 }
@@ -541,15 +663,16 @@ class MainActivity : AppCompatActivity() {
                     imgPower.setColorFilter(Color.parseColor("#4ADE80"))
 
                     Toast.makeText(this@MainActivity, "WARP VPN Connected Successfully!", Toast.LENGTH_SHORT).show()
-                    appendLog("Connected to WARP VPN!")
+                    appendLog("✅ Connected to WARP VPN!")
 
                     startPingManager()
                 }
 
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    appendLog("Error: ${e.localizedMessage}")
-                    Toast.makeText(this@MainActivity, "Connection Failed!", Toast.LENGTH_SHORT).show()
+                    appendLog("Connection Error: ${e.message}")
+                    e.printStackTrace()
+                    Toast.makeText(this@MainActivity, "Connection Failed: ${e.message}", Toast.LENGTH_LONG).show()
                     resetUi()
                 }
             }
@@ -570,7 +693,7 @@ class MainActivity : AppCompatActivity() {
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    appendLog("Disconnect Error: ${e.localizedMessage}")
+                    appendLog("Disconnect Error: ${e.message}")
                     resetUi()
                 }
             }
@@ -605,9 +728,9 @@ class MainActivity : AppCompatActivity() {
             val pingTime = System.currentTimeMillis() - startTime
 
             if (reachable) {
-                appendLog("Ping (1.1.1.1): $pingTime ms")
+                appendLog("🏓 Ping (1.1.1.1): $pingTime ms")
             } else {
-                appendLog("Ping Timeout")
+                appendLog("⏰ Ping Timeout")
             }
         } catch (e: Exception) {
             appendLog("Ping Error: ${e.localizedMessage}")
@@ -622,6 +745,8 @@ class MainActivity : AppCompatActivity() {
         btnConnectCard.setStrokeColor(Color.parseColor("#334155"))
         imgPower.setColorFilter(Color.parseColor("#94A3B8"))
     }
+
+    // ==================== Config Management ====================
 
     private fun getAllConfigs(): List<ConfigModel> {
         val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
@@ -641,7 +766,9 @@ class MainActivity : AppCompatActivity() {
                     )
                 )
             }
-        } catch (e: Exception) { e.printStackTrace() }
+        } catch (e: Exception) { 
+            e.printStackTrace() 
+        }
 
         if (list.isNotEmpty() && list.none { it.isSelected }) {
             list[0].isSelected = true
@@ -691,6 +818,8 @@ class MainActivity : AppCompatActivity() {
         prefs.edit().putString("CONFIG_LIST_JSON", array.toString()).apply()
     }
 
+    // ==================== Config Adapter ====================
+
     class ConfigAdapter(
         private val list: List<ConfigModel>,
         private val onItemClick: (ConfigModel) -> Unit,
@@ -731,6 +860,8 @@ class MainActivity : AppCompatActivity() {
 
         override fun getItemCount(): Int = list.size
     }
+
+    // ==================== WgTunnel ====================
 
     class WgTunnel : com.wireguard.android.backend.Tunnel {
         override fun getName(): String = "WARPTunnel"
