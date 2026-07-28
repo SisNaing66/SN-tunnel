@@ -3,13 +3,14 @@ package com.myanmar.warpvpn
 import android.content.Intent
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
-import libxray.Libxray
-import java.io.File
+import libv2ray.Libv2ray
+import libv2ray.CoreController
 
 class XrayVpnService : VpnService() {
 
     private var vpnInterface: ParcelFileDescriptor? = null
     private var isRunning = false
+    private var coreController: CoreController? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action
@@ -40,11 +41,10 @@ class XrayVpnService : VpnService() {
 
             vpnInterface = builder.establish()
             val fd = vpnInterface?.fd ?: return
-          
-            val configFile = File(cacheDir, "xray_config.json")
-            configFile.writeText(configJson)
             
-            Libxray.startXray(configFile.absolutePath, fd.toLong())
+            coreController = Libv2ray.newCoreController(null)
+            
+            coreController?.startLoop(configJson, fd)
             isRunning = true
 
         } catch (e: Exception) {
@@ -56,7 +56,8 @@ class XrayVpnService : VpnService() {
     private fun stopVpn() {
         try {
             if (isRunning) {
-                Libxray.stopXray()
+                coreController?.stopLoop()
+                coreController = null
                 isRunning = false
             }
             vpnInterface?.close()
