@@ -7,7 +7,6 @@ import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
 import android.net.VpnService
-import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -32,6 +31,8 @@ import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.switchmaterial.SwitchMaterial
+import com.wireguard.android.backend.GoBackend
+import com.wireguard.config.Config
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -40,6 +41,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.ByteArrayInputStream
 import java.net.InetAddress
 
 data class ConfigModel(
@@ -82,14 +84,16 @@ class MainActivity : AppCompatActivity() {
 
     private var isConnected = false
     private var pingJob: Job? = null
-    private var pendingXrayJson: String? = null
+
+    private val backend by lazy { GoBackend(applicationContext) }
+    private val tunnel = WgTunnel()
 
     private val vpnPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == RESULT_OK) {
             appendLog("VPN Permission Granted!")
-            startXrayVpn()
+            connectVpn()
         } else {
             appendLog("VPN Permission Denied!")
             resetUi()
@@ -109,7 +113,7 @@ class MainActivity : AppCompatActivity() {
 
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-
+        
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
@@ -223,7 +227,7 @@ class MainActivity : AppCompatActivity() {
                 startPingManager()
             }
         }
-
+        
         btnRestoreDefaults.setOnClickListener {
             showRestoreDefaultsDialog()
         }
@@ -247,7 +251,7 @@ class MainActivity : AppCompatActivity() {
 
         updateActiveServerName()
     }
-
+    
     private fun showRestoreDefaultsDialog() {
         AlertDialog.Builder(this)
             .setTitle("Restore Defaults")
@@ -255,7 +259,7 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton("OK") { dialog, _ ->
                 val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
                 prefs.edit().clear().apply()
-
+                
                 switchDarkMode.isChecked = true
                 switchLogs.isChecked = true
                 switchPing.isChecked = true
@@ -266,7 +270,7 @@ class MainActivity : AppCompatActivity() {
                 appendLog("Restored all settings and configs to default.")
                 Toast.makeText(this, "All settings restored to defaults!", Toast.LENGTH_SHORT).show()
                 drawerLayout.closeDrawer(GravityCompat.START)
-
+                
                 AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
                 dialog.dismiss()
             }
@@ -275,7 +279,7 @@ class MainActivity : AppCompatActivity() {
             }
             .show()
     }
-
+    
     private fun showExitDialog() {
         AlertDialog.Builder(this)
             .setTitle("Exit WARP TUNNEL")
@@ -392,6 +396,8 @@ class MainActivity : AppCompatActivity() {
                         inputText
                     }
 
+                    Config.parse(ByteArrayInputStream(parsedConfig.toByteArray()))
+
                     val newId = System.currentTimeMillis().toString()
                     val name = "Imported Server #${getAllConfigs().size + 1}"
                     val endpoint = extractEndpoint(parsedConfig)
@@ -444,6 +450,23 @@ class MainActivity : AppCompatActivity() {
         """.trimIndent()
     }
 
+    private fun applyCustomDnsToConfig(rawConfig: String): String {
+        val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
+        val dnsSetting = prefs.getString("DNS_SETTING", "DEFAULT")
+
+        val targetDns = when (dnsSetting) {
+            "CLOUDFLARE" -> "1.1.1.1, 1.0.0.1"
+            "GOOGLE" -> "8.8.8.8, 8.8.4.4"
+            else -> return rawConfig
+        }
+
+        return if (rawConfig.contains("DNS =")) {
+            rawConfig.replace(Regex("DNS\\s*=\\s*[^\\n]+"), "DNS = $targetDns")
+        } else {
+            rawConfig.replace("[Interface]", "[Interface]\nDNS = $targetDns")
+        }
+    }
+
     private fun appendLog(message: String) {
         runOnUiThread {
             tvLogs.append("> $message\n")
@@ -454,10 +477,21 @@ class MainActivity : AppCompatActivity() {
         tvStatus.text = "CONNECTING..."
         btnConnectCard.setStrokeColor(Color.parseColor("#F59E0B"))
 
+        val intent = VpnService.prepare(this)
+        if (intent != null) {
+            appendLog("Requesting VPN Permission...")
+            vpnPermissionLauncher.launch(intent)
+        } else {
+            appendLog("VPN Permission already granted.")
+            connectVpn()
+        }
+    }
+
+    private fun connectVpn() {
         lifecycleScope.launch(Dispatchers.IO) {
             try {
                 var selectedModel = getSelectedConfig()
-                var rawConfigStr: String
+                var configStr: String
 
                 if (selectedModel == null) {
                     val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
@@ -465,27 +499,34 @@ class MainActivity : AppCompatActivity() {
 
                     appendLog("No config found. Requesting NEW Config via Engine: $engineMode...")
                     val wgcf = WgcfManager()
-                    rawConfigStr = wgcf.registerAndGetXrayJson(engineMode)
+                    configStr = wgcf.registerAndGetConfig(engineMode)
 
-                    val newModel = ConfigModel("warp_default", "WARP Auto Clean IP", rawConfigStr, extractEndpoint(rawConfigStr), true)
+                    val newModel = ConfigModel("warp_default", "WARP Auto Clean IP", configStr, extractEndpoint(configStr), true)
                     saveNewConfig(newModel)
                     appendLog("NEW WARP Config saved!")
                 } else {
-                    rawConfigStr = selectedModel.content
+                    configStr = selectedModel.content
                     appendLog("Using Active Config [${selectedModel.name}]...")
                 }
-                
-                val xrayJson = convertToXrayJsonIfNeeded(rawConfigStr)
-                pendingXrayJson = xrayJson
+
+                configStr = applyCustomDnsToConfig(configStr)
+
+                appendLog("Building Tunnel Session...")
+                val wgConfig = Config.parse(ByteArrayInputStream(configStr.toByteArray()))
+
+                backend.setState(tunnel, com.wireguard.android.backend.Tunnel.State.UP, wgConfig)
 
                 withContext(Dispatchers.Main) {
-                    val intent = VpnService.prepare(this@MainActivity)
-                    if (intent != null) {
-                        appendLog("Requesting VPN Permission...")
-                        vpnPermissionLauncher.launch(intent)
-                    } else {
-                        startXrayVpn()
-                    }
+                    isConnected = true
+                    tvStatus.text = "CONNECTED"
+                    tvStatus.setTextColor(Color.parseColor("#4ADE80"))
+                    btnConnectCard.setStrokeColor(Color.parseColor("#4ADE80"))
+                    imgPower.setColorFilter(Color.parseColor("#4ADE80"))
+
+                    Toast.makeText(this@MainActivity, "WARP VPN Connected Successfully!", Toast.LENGTH_SHORT).show()
+                    appendLog("Connected to WARP VPN!")
+
+                    startPingManager()
                 }
 
             } catch (e: Exception) {
@@ -498,107 +539,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun convertToXrayJsonIfNeeded(configStr: String): String {
-        if (configStr.trim().startsWith("{")) {
-            return configStr
-        }
-        
-        var privateKey = ""
-        var addressList = mutableListOf<String>()
-        var publicKey = ""
-        var endpoint = "162.159.192.1:500"
-
-        configStr.lines().forEach { line ->
-            val trimmed = line.trim()
-            when {
-                trimmed.startsWith("PrivateKey", ignoreCase = true) -> privateKey = trimmed.substringAfter("=").trim()
-                trimmed.startsWith("Address", ignoreCase = true) -> {
-                    val addrs = trimmed.substringAfter("=").trim().split(",")
-                    addrs.forEach { addressList.add(it.trim()) }
-                }
-                trimmed.startsWith("PublicKey", ignoreCase = true) -> publicKey = trimmed.substringAfter("=").trim()
-                trimmed.startsWith("Endpoint", ignoreCase = true) -> endpoint = trimmed.substringAfter("=").trim()
-            }
-        }
-
-        val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
-        val dnsSetting = prefs.getString("DNS_SETTING", "DEFAULT")
-        val dnsServer = when (dnsSetting) {
-            "CLOUDFLARE" -> "1.1.1.1"
-            "GOOGLE" -> "8.8.8.8"
-            else -> "1.1.1.1"
-        }
-
-        val addressArray = JSONArray()
-        addressList.forEach { addressArray.put(it) }
-
-        val xrayConfig = JSONObject().apply {
-            put("log", JSONObject().put("loglevel", "warning"))
-            put("dns", JSONObject().put("servers", JSONArray().put(dnsServer)))
-
-            put("inbounds", JSONArray().put(JSONObject().apply {
-                put("tag", "tun-in")
-                put("port", 10808)
-                put("protocol", "dokodemo-door")
-                put("settings", JSONObject().apply {
-                    put("network", "tcp,udp")
-                    put("followRedirect", true)
-                })
-            }))
-
-            put("outbounds", JSONArray().put(JSONObject().apply {
-                put("tag", "proxy")
-                put("protocol", "wireguard")
-                put("settings", JSONObject().apply {
-                    put("secretKey", privateKey)
-                    put("address", addressArray)
-                    put("reserved", JSONArray().put(0).put(0).put(0))
-                    put("mtu", 1280)
-                    put("peers", JSONArray().put(JSONObject().apply {
-                        put("publicKey", publicKey)
-                        put("endpoint", endpoint)
-                    }))
-                })
-            }))
-        }
-
-        return xrayConfig.toString(2)
-    }
-
-    private fun startXrayVpn() {
-        val configJson = pendingXrayJson ?: return
-        val intent = Intent(this, XrayVpnService::class.java).apply {
-            putExtra("XRAY_CONFIG", configJson)
-        }
-        
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent)
-        } else {
-            startService(intent)
-        }
-
-        isConnected = true
-        tvStatus.text = "CONNECTED"
-        tvStatus.setTextColor(Color.parseColor("#4ADE80"))
-        btnConnectCard.setStrokeColor(Color.parseColor("#4ADE80"))
-        imgPower.setColorFilter(Color.parseColor("#4ADE80"))
-
-        Toast.makeText(this, "WARP VPN Connected!", Toast.LENGTH_SHORT).show()
-        appendLog("Connected to WARP VPN via Xray-core Engine!")
-
-        startPingManager()
-    }
-
     private fun disconnectVpn() {
         lifecycleScope.launch(Dispatchers.IO) {
             try {
                 stopPingManager()
-                appendLog("Stopping Xray VPN Service...")
-                
-                val intent = Intent(this@MainActivity, XrayVpnService::class.java).apply {
-                    action = "STOP_VPN"
-                }
-                startService(intent)
+                appendLog("Stopping VPN Tunnel...")
+                backend.setState(tunnel, com.wireguard.android.backend.Tunnel.State.DOWN, null)
 
                 withContext(Dispatchers.Main) {
                     appendLog("Disconnected from VPN.")
@@ -767,5 +713,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         override fun getItemCount(): Int = list.size
+    }
+
+    class WgTunnel : com.wireguard.android.backend.Tunnel {
+        override fun getName(): String = "WARPTunnel"
+        override fun onStateChange(newState: com.wireguard.android.backend.Tunnel.State) {}
     }
 }
