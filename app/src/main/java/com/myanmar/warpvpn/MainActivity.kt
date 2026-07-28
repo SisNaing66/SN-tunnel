@@ -17,6 +17,7 @@ import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -112,6 +113,16 @@ class MainActivity : AppCompatActivity() {
 
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
+                    drawerLayout.closeDrawer(GravityCompat.START)
+                } else {
+                    showExitDialog()
+                }
+            }
+        })
 
         drawerLayout = findViewById(R.id.drawerLayout)
         btnMenu = findViewById(R.id.btnMenu)
@@ -147,7 +158,6 @@ class MainActivity : AppCompatActivity() {
         switchLogs.isChecked = prefs.getBoolean("SHOW_LOGS", true)
         switchPing.isChecked = prefs.getBoolean("AUTO_PING", true)
 
-        // Engine Selection UI Setup
         val savedEngine = prefs.getString("WARP_ENGINE", "CF_DIRECT")
         setEngineSelectionUI(savedEngine == "CF_DIRECT")
 
@@ -217,12 +227,9 @@ class MainActivity : AppCompatActivity() {
                 startPingManager()
             }
         }
-
+        
         btnRestoreDefaults.setOnClickListener {
-            prefs.edit().clear().apply()
-            Toast.makeText(this, "Defaults Restored!", Toast.LENGTH_SHORT).show()
-            appendLog("Restored default settings. Saved Configs cleared.")
-            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+            showRestoreDefaultsDialog()
         }
 
         btnMenu.setOnClickListener {
@@ -243,6 +250,54 @@ class MainActivity : AppCompatActivity() {
         }
 
         updateActiveServerName()
+    }
+    
+    private fun showRestoreDefaultsDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Restore Defaults")
+            .setMessage("Are you sure you want to reset all settings, configs, and preferences to default?")
+            .setPositiveButton("OK") { dialog, _ ->
+                val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
+                prefs.edit().clear().apply()
+                
+                switchDarkMode.isChecked = true
+                switchLogs.isChecked = true
+                switchPing.isChecked = true
+                rbDnsDefault.isChecked = true
+                setEngineSelectionUI(true)
+
+                updateActiveServerName()
+                appendLog("Restored all settings and configs to default.")
+                Toast.makeText(this, "All settings restored to defaults!", Toast.LENGTH_SHORT).show()
+                drawerLayout.closeDrawer(GravityCompat.START)
+                
+                AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel") { dialog, _ ->
+                dialog.dismiss()
+            }
+            .show()
+    }
+    
+    private fun showExitDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Exit WARP TUNNEL")
+            .setMessage("Choose whether to minimize to background or exit the app completely.")
+            .setPositiveButton("Exit") { _, _ ->
+                if (isConnected) {
+                    disconnectVpn()
+                }
+                finishAffinity()
+            }
+            .setNeutralButton("Minimize") { dialog, _ ->
+                dialog.dismiss()
+                moveTaskToBack(true)
+            }
+            .setNegativeButton("Cancel") { dialog, _ ->
+                dialog.dismiss()
+            }
+            .show()
     }
 
     private fun setEngineSelectionUI(isCfDirect: Boolean) {
