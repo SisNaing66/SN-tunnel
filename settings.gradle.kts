@@ -11,8 +11,9 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven { url = java.net.URI("https://jitpack.io") }
     }
 }
 
-rootProject.name = "wgcf-vpn"
+rootProject.name = "warp-tunnel"
 include(":app")
