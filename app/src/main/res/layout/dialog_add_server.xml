@@ -29,7 +29,7 @@
             android:layout_height="120dp"
             android:fontFamily="monospace"
             android:gravity="top|start"
-            android:hint="Paste WireGuard [Interface] Config here..."
+            android:hint="Paste WireGuard Config here..."
             android:textColor="?attr/colorOnBackground"
             android:textSize="12sp" />
     </com.google.android.material.textfield.TextInputLayout>
