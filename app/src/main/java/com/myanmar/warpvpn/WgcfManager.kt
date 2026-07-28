@@ -21,14 +21,11 @@ class WgcfManager {
     private val cfApiBase = "https://api.cloudflareclient.com/v0i1909051800"
     private val customApiUrl = "https://nyeinkokoaung.alwaysdata.net/wg/api.php"
 
-    suspend fun registerAndGetConfig(): String = withContext(Dispatchers.IO) {
-        try {
-            // 1. Direct Cloudflare API
-            return@withContext fetchFromCloudflareApi()
-        } catch (e: Exception) {
-            e.printStackTrace()
-            // 2. Custom PHP Backup API
+    suspend fun registerAndGetConfig(engineMode: String = "CF_DIRECT"): String = withContext(Dispatchers.IO) {
+        if (engineMode == "CUSTOM_API") {
             return@withContext fetchFromCustomApi()
+        } else {
+            return@withContext fetchFromCloudflareApi()
         }
     }
 
@@ -56,7 +53,7 @@ class WgcfManager {
             .build()
 
         val response = client.newCall(regRequest).execute()
-        val responseData = response.body?.string() ?: throw Exception("CF API Response Empty")
+        val responseData = response.body?.string() ?: throw Exception("CF API Empty")
 
         if (!response.isSuccessful) {
             throw Exception("CF API Failed Code: ${response.code}")
@@ -121,7 +118,7 @@ class WgcfManager {
 
         val cleanIp = "162.159.192.1"
         val cleanPort = "500"
-        
+
         return """
             [Interface]
             PrivateKey = $privateKey
