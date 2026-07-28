@@ -19,7 +19,7 @@ class WgcfManager {
         .build()
 
     private val cfApiBase = "https://api.cloudflareclient.com/v0i1909051800"
-    private val customApiUrl = "https://iam404.serv00.net/api/wg/generate.php"
+    private val customApiUrl = "https://nyeinkokoaung.alwaysdata.net/wg/api.php"
 
     suspend fun registerAndGetConfig(engineMode: String = "CF_DIRECT"): String = withContext(Dispatchers.IO) {
         if (engineMode == "CUSTOM_API") {
@@ -29,6 +29,7 @@ class WgcfManager {
         }
     }
 
+    // --- 1. Direct Cloudflare API ---
     private fun fetchFromCloudflareApi(): String {
         val keyPair = KeyPair()
         val privateKey = keyPair.privateKey.toBase64()
@@ -91,6 +92,7 @@ class WgcfManager {
         """.trimIndent()
     }
 
+    // --- 2. Custom PHP Backup API ---
     private fun fetchFromCustomApi(): String {
         val userId = (100000..999999).random().toString()
         val requestUrl = "$customApiUrl?user_id=$userId"
@@ -112,21 +114,22 @@ class WgcfManager {
         }
 
         val configObj = json.getJSONObject("config")
-        val privateKey = configObj.getString("private_key")
-        val address = configObj.getString("address")
-        val publicKey = configObj.getString("public_key")
+        val clientPrivateKey = configObj.getString("private_key").trim()
+        val clientAddress = configObj.getString("address").trim()
+        
+        val serverPublicKey = configObj.getString("public_key").trim()
 
         val cleanIp = "162.159.192.1"
         val cleanPort = "500"
-
+        
         return """
             [Interface]
-            PrivateKey = $privateKey
-            Address = $address
+            PrivateKey = $clientPrivateKey
+            Address = $clientAddress
             DNS = 1.1.1.1, 1.0.0.1
 
             [Peer]
-            PublicKey = $publicKey
+            PublicKey = $serverPublicKey
             Endpoint = $cleanIp:$cleanPort
             AllowedIPs = 0.0.0.0/0, ::/0
         """.trimIndent()
