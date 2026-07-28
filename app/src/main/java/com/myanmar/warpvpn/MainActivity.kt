@@ -13,6 +13,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.ImageView
+import android.widget.RadioButton
+import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -41,7 +43,13 @@ import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.net.InetAddress
 
-data class ConfigModel(val id: String, val name: String, val content: String, val endpoint: String)
+data class ConfigModel(
+    val id: String,
+    val name: String,
+    val content: String,
+    val endpoint: String,
+    var isSelected: Boolean = false
+)
 
 class MainActivity : AppCompatActivity() {
 
@@ -61,6 +69,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var switchDarkMode: SwitchMaterial
     private lateinit var switchLogs: SwitchMaterial
     private lateinit var switchPing: SwitchMaterial
+    private lateinit var rgDns: RadioGroup
+    private lateinit var rbDnsDefault: RadioButton
+    private lateinit var rbDnsCloudflare: RadioButton
+    private lateinit var rbDnsGoogle: RadioButton
     private lateinit var btnRestoreDefaults: MaterialButton
     private lateinit var tvTelegram: TextView
 
@@ -112,6 +124,12 @@ class MainActivity : AppCompatActivity() {
         switchDarkMode = findViewById(R.id.switchDarkMode)
         switchLogs = findViewById(R.id.switchLogs)
         switchPing = findViewById(R.id.switchPing)
+
+        rgDns = findViewById(R.id.rgDns)
+        rbDnsDefault = findViewById(R.id.rbDnsDefault)
+        rbDnsCloudflare = findViewById(R.id.rbDnsCloudflare)
+        rbDnsGoogle = findViewById(R.id.rbDnsGoogle)
+
         btnRestoreDefaults = findViewById(R.id.btnRestoreDefaults)
         tvTelegram = findViewById(R.id.tvTelegram)
 
@@ -119,9 +137,26 @@ class MainActivity : AppCompatActivity() {
         switchLogs.isChecked = prefs.getBoolean("SHOW_LOGS", true)
         switchPing.isChecked = prefs.getBoolean("AUTO_PING", true)
 
+        // DNS Setting Value
+        when (prefs.getString("DNS_SETTING", "DEFAULT")) {
+            "CLOUDFLARE" -> rbDnsCloudflare.isChecked = true
+            "GOOGLE" -> rbDnsGoogle.isChecked = true
+            else -> rbDnsDefault.isChecked = true
+        }
+
         cardLogs.visibility = if (switchLogs.isChecked) View.VISIBLE else View.GONE
 
-        // --- Logs Copy & Clear Events ---
+        // DNS Radio Group Change Event
+        rgDns.setOnCheckedChangeListener { _, checkedId ->
+            val dnsType = when (checkedId) {
+                R.id.rbDnsCloudflare -> "CLOUDFLARE"
+                R.id.rbDnsGoogle -> "GOOGLE"
+                else -> "DEFAULT"
+            }
+            prefs.edit().putString("DNS_SETTING", dnsType).apply()
+            appendLog("DNS Mode set to: $dnsType")
+        }
+
         btnClearLogs.setOnClickListener {
             tvLogs.text = "> Logs cleared.\n"
             Toast.makeText(this, "Logs Cleared", Toast.LENGTH_SHORT).show()
@@ -187,15 +222,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateActiveServerName() {
-        val configs = getAllConfigs()
-        if (configs.isNotEmpty()) {
-            tvServerName.text = "${configs[0].name} [${configs[0].endpoint}]"
+        val selected = getSelectedConfig()
+        if (selected != null) {
+            tvServerName.text = "${selected.name} [${selected.endpoint}]"
         } else {
             tvServerName.text = "WARP Auto Clean IP [Auto]"
         }
     }
 
-    // --- Bottom Sheet Display (Config List & Empty State) ---
+    // --- Bottom Sheet Display ---
     private fun showSelectLocationBottomSheet() {
         val bottomSheet = BottomSheetDialog(this)
         val dialogView = layoutInflater.inflate(R.layout.dialog_select_location, null)
@@ -216,6 +251,7 @@ class MainActivity : AppCompatActivity() {
                 tvEmptyState.visibility = View.GONE
                 rvConfigs.visibility = View.VISIBLE
                 rvConfigs.adapter = ConfigAdapter(configList, { selectedConfig ->
+                    setSelectedConfig(selectedConfig.id)
                     updateActiveServerName()
                     bottomSheet.dismiss()
                 }, { deleteConfig ->
@@ -266,12 +302,13 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     Config.parse(ByteArrayInputStream(parsedConfig.toByteArray()))
-                    
+
+                    val newId = System.currentTimeMillis().toString()
                     val name = "Imported Server #${getAllConfigs().size + 1}"
                     val endpoint = extractEndpoint(parsedConfig)
-                    
-                    saveNewConfig(ConfigModel(System.currentTimeMillis().toString(), name, parsedConfig, endpoint))
-                    
+
+                    saveNewConfig(ConfigModel(newId, name, parsedConfig, endpoint, true))
+
                     appendLog("Config Imported Successfully!")
                     Toast.makeText(this, "Config Imported Successfully!", Toast.LENGTH_SHORT).show()
                     updateActiveServerName()
@@ -318,6 +355,23 @@ class MainActivity : AppCompatActivity() {
         """.trimIndent()
     }
 
+    private fun applyCustomDnsToConfig(rawConfig: String): String {
+        val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
+        val dnsSetting = prefs.getString("DNS_SETTING", "DEFAULT")
+
+        val targetDns = when (dnsSetting) {
+            "CLOUDFLARE" -> "1.1.1.1, 1.0.0.1"
+            "GOOGLE" -> "8.8.8.8, 8.8.4.4"
+            else -> return rawConfig
+        }
+
+        return if (rawConfig.contains("DNS =")) {
+            rawConfig.replace(Regex("DNS\\s*=\\s*[^\\n]+"), "DNS = $targetDns")
+        } else {
+            rawConfig.replace("[Interface]", "[Interface]\nDNS = $targetDns")
+        }
+    }
+
     private fun appendLog(message: String) {
         runOnUiThread {
             tvLogs.append("> $message\n")
@@ -341,21 +395,23 @@ class MainActivity : AppCompatActivity() {
     private fun connectVpn() {
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                val activeConfigs = getAllConfigs()
+                var selectedModel = getSelectedConfig()
                 var configStr: String
 
-                if (activeConfigs.isEmpty()) {
+                if (selectedModel == null) {
                     appendLog("No config found. Requesting NEW WARP Config...")
                     val wgcf = WgcfManager()
                     configStr = wgcf.registerAndGetConfig()
-                    
-                    val newModel = ConfigModel("warp_default", "WARP Auto Clean IP", configStr, extractEndpoint(configStr))
+
+                    val newModel = ConfigModel("warp_default", "WARP Auto Clean IP", configStr, extractEndpoint(configStr), true)
                     saveNewConfig(newModel)
                     appendLog("NEW WARP Config saved!")
                 } else {
-                    configStr = activeConfigs[0].content
-                    appendLog("Using Active Config [${activeConfigs[0].name}]...")
+                    configStr = selectedModel.content
+                    appendLog("Using Active Config [${selectedModel.name}]...")
                 }
+                
+                configStr = applyCustomDnsToConfig(configStr)
 
                 appendLog("Building Tunnel Session...")
                 val wgConfig = Config.parse(ByteArrayInputStream(configStr.toByteArray()))
@@ -452,7 +508,7 @@ class MainActivity : AppCompatActivity() {
         imgPower.setColorFilter(Color.parseColor("#94A3B8"))
     }
 
-    // --- Multi Config Data Manager ---
+    // --- Multi Config Data Manager (With Selection State) ---
     private fun getAllConfigs(): List<ConfigModel> {
         val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
         val jsonStr = prefs.getString("CONFIG_LIST_JSON", "[]")
@@ -461,20 +517,48 @@ class MainActivity : AppCompatActivity() {
             val array = JSONArray(jsonStr)
             for (i in 0 until array.length()) {
                 val obj = array.getJSONObject(i)
-                list.add(ConfigModel(obj.getString("id"), obj.getString("name"), obj.getString("content"), obj.getString("endpoint")))
+                list.add(
+                    ConfigModel(
+                        obj.getString("id"),
+                        obj.getString("name"),
+                        obj.getString("content"),
+                        obj.getString("endpoint"),
+                        obj.optBoolean("isSelected", false)
+                    )
+                )
             }
         } catch (e: Exception) { e.printStackTrace() }
+        
+        if (list.isNotEmpty() && list.none { it.isSelected }) {
+            list[0].isSelected = true
+        }
         return list
+    }
+
+    private fun getSelectedConfig(): ConfigModel? {
+        val list = getAllConfigs()
+        return list.find { it.isSelected } ?: list.firstOrNull()
+    }
+
+    private fun setSelectedConfig(id: String) {
+        val list = getAllConfigs()
+        list.forEach { it.isSelected = (it.id == id) }
+        saveConfigList(list)
     }
 
     private fun saveNewConfig(model: ConfigModel) {
         val list = getAllConfigs().toMutableList()
-        list.add(0, model) // Add to top
+        list.forEach { it.isSelected = false }
+        model.isSelected = true
+        list.add(0, model)
         saveConfigList(list)
     }
 
     private fun deleteConfigById(id: String) {
         val list = getAllConfigs().filter { it.id != id }
+        if (list.isNotEmpty() && list.none { it.isSelected }) {
+            list[0].isSelected = true
+        }
         saveConfigList(list)
     }
 
@@ -486,13 +570,14 @@ class MainActivity : AppCompatActivity() {
             obj.put("name", it.name)
             obj.put("content", it.content)
             obj.put("endpoint", it.endpoint)
+            obj.put("isSelected", it.isSelected)
             array.put(obj)
         }
         val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
         prefs.edit().putString("CONFIG_LIST_JSON", array.toString()).apply()
     }
 
-    // --- RecyclerView Adapter ---
+    // --- RecyclerView Adapter (Highlight Active Server) ---
     class ConfigAdapter(
         private val list: List<ConfigModel>,
         private val onItemClick: (ConfigModel) -> Unit,
@@ -503,7 +588,8 @@ class MainActivity : AppCompatActivity() {
             val tvName: TextView = view.findViewById(R.id.tvName)
             val tvEndpoint: TextView = view.findViewById(R.id.tvEndpoint)
             val btnDelete: ImageView = view.findViewById(R.id.btnDelete)
-            val cardItem: View = view.findViewById(R.id.cardItem)
+            val imgCheck: ImageView = view.findViewById(R.id.imgCheck)
+            val cardItem: MaterialCardView = view.findViewById(R.id.cardItem)
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -515,6 +601,16 @@ class MainActivity : AppCompatActivity() {
             val item = list[position]
             holder.tvName.text = item.name
             holder.tvEndpoint.text = item.endpoint
+            
+            if (item.isSelected) {
+                holder.cardItem.strokeColor = Color.parseColor("#22C55E")
+                holder.cardItem.strokeWidth = 4
+                holder.imgCheck.visibility = View.VISIBLE
+            } else {
+                holder.cardItem.strokeColor = Color.parseColor("#334155")
+                holder.cardItem.strokeWidth = 2
+                holder.imgCheck.visibility = View.GONE
+            }
 
             holder.cardItem.setOnClickListener { onItemClick(item) }
             holder.btnDelete.setOnClickListener { onDeleteClick(item) }
