@@ -104,8 +104,7 @@ class MainActivity : AppCompatActivity() {
         switchPing.isChecked = prefs.getBoolean("AUTO_PING", true)
 
         cardLogs.visibility = if (switchLogs.isChecked) View.VISIBLE else View.GONE
-
-        // WARP Server Card နှိပ်ပါက Select Location Bottom Sheet ပေါ်ရန်
+        
         cardServer.setOnClickListener {
             showSelectLocationBottomSheet()
         }
@@ -173,7 +172,7 @@ class MainActivity : AppCompatActivity() {
             tvConfigSubtitle.text = "Saved WireGuard Config Active"
         } else {
             tvConfigTitle.text = "WARP Auto Clean IP"
-            tvConfigSubtitle.text = "162.159.*****"
+            tvConfigSubtitle.text = "162.159.192.1:500"
         }
 
         // Delete Config Event
@@ -197,7 +196,7 @@ class MainActivity : AppCompatActivity() {
         bottomSheet.show()
     }
 
-    // --- Import Custom WireGuard Config Dialog ---
+    // --- Import Custom WireGuard Config Dialog (Text & wireguard:// URI) ---
     private fun showImportConfigDialog() {
         val dialogView = layoutInflater.inflate(R.layout.dialog_add_server, null)
         val etConfigInput = dialogView.findViewById<EditText>(R.id.etConfigInput)
@@ -212,22 +211,63 @@ class MainActivity : AppCompatActivity() {
 
         btnImport.setOnClickListener {
             val inputText = etConfigInput.text.toString().trim()
-            if (inputText.isNotEmpty() && inputText.contains("[Interface]")) {
+
+            if (inputText.isNotEmpty()) {
                 try {
-                    Config.parse(ByteArrayInputStream(inputText.toByteArray()))
-                    saveConfig(inputText)
-                    appendLog("Custom WireGuard Config Imported Successfully!")
+                    val parsedConfig = if (inputText.startsWith("wireguard://", ignoreCase = true)) {
+                        // 1. wireguard:// Link Format
+                        parseWireGuardUri(inputText)
+                    } else {
+                        // 2. Standard [Interface] Text Format
+                        inputText
+                    }
+                    
+                    Config.parse(ByteArrayInputStream(parsedConfig.toByteArray()))
+                    saveConfig(parsedConfig)
+                    appendLog("Custom WireGuard Config / URI Imported Successfully!")
                     Toast.makeText(this, "Config Imported Successfully!", Toast.LENGTH_SHORT).show()
                     dialog.dismiss()
+
                 } catch (e: Exception) {
-                    Toast.makeText(this, "Invalid Config Format!", Toast.LENGTH_SHORT).show()
+                    e.printStackTrace()
+                    Toast.makeText(this, "Invalid WireGuard Format or URI Link!", Toast.LENGTH_SHORT).show()
                 }
             } else {
-                Toast.makeText(this, "Please paste valid WireGuard Config!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Please paste valid Config Text or wireguard:// Link!", Toast.LENGTH_SHORT).show()
             }
         }
 
         dialog.show()
+    }
+    
+    private fun parseWireGuardUri(uriString: String): String {
+        val uri = Uri.parse(uriString)
+
+        val privateKey = Uri.decode(uri.userInfo ?: throw Exception("Missing PrivateKey"))
+        val host = uri.host ?: throw Exception("Missing Endpoint Host")
+        val port = if (uri.port != -1) uri.port else 500
+        val endpoint = "$host:$port"
+
+        val address = Uri.decode(uri.getQueryParameter("address") ?: "")
+        val publicKey = Uri.decode(uri.getQueryParameter("publickey") ?: "")
+        val mtu = uri.getQueryParameter("mtu") ?: "1280"
+
+        if (address.isEmpty() || publicKey.isEmpty()) {
+            throw Exception("Missing address or publickey in URI")
+        }
+
+        return """
+            [Interface]
+            PrivateKey = $privateKey
+            Address = $address
+            DNS = 1.1.1.1, 1.0.0.1
+            MTU = $mtu
+
+            [Peer]
+            PublicKey = $publicKey
+            Endpoint = $endpoint
+            AllowedIPs = 0.0.0.0/0, ::/0
+        """.trimIndent()
     }
 
     private fun appendLog(message: String) {
