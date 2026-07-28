@@ -36,7 +36,7 @@ jobs:
       - name: Grant Execute Permission for Gradle Wrapper
         run: chmod +x ./gradlew
 
-      - name: Build Debug APKs
+      - name: Build APKs
         run: ./gradlew assembleDebug --no-daemon
 
       # ----------------------------------------------------
@@ -46,7 +46,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: "v1.0.0-builds"
+          tag_name: "v1.0.0"
           name: "WARP TUNNEL Builds"
           body: |
             ### 🚀 WARP TUNNEL Split APK Builds
