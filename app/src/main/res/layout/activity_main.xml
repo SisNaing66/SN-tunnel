@@ -28,7 +28,7 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:clickable="true"
                 android:focusable="true"
-                android:src="@android:drawable/ic_menu_sort_by_size"
+                android:src="@drawable/ic_menu_compass"
                 app:tint="?attr/colorOnBackground" />
 
             <TextView
@@ -117,7 +117,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="12dp"
                     android:layout_weight="1"
-                    android:text="WARP Auto Clean IP [162.159.192.1]"
+                    android:text="WARP Auto Clean IP [162.159.***.*]"
                     android:textColor="?attr/colorOnBackground"
                     android:textSize="14sp"
                     android:textStyle="bold" />
@@ -207,7 +207,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:fontFamily="monospace"
-                        android:text="> Waiting for connection...\n"
+                        android:text="🫠 Welcome from Warp Tunnel...\n"
                         android:textColor="#4ADE80"
                         android:textSize="12sp" />
                 </ScrollView>
