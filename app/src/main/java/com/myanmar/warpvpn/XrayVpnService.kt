@@ -31,9 +31,7 @@ class XrayVpnService : VpnService() {
         try {
             val builder = Builder()
                 .addAddress("26.26.26.1", 24)
-                .addAddress("fdfe:dcba:9876::1", 126)
                 .addRoute("0.0.0.0", 0)
-                .addRoute("::", 0)
                 .addDnsServer("1.1.1.1")
                 .addDnsServer("8.8.8.8")
                 .setMtu(1280)
@@ -41,9 +39,8 @@ class XrayVpnService : VpnService() {
 
             vpnInterface = builder.establish()
             val fd = vpnInterface?.fd ?: return
-            
+
             coreController = Libv2ray.newCoreController(null)
-            
             coreController?.startLoop(configJson, fd)
             isRunning = true
 
