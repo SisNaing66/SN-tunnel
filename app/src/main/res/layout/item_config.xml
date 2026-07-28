@@ -15,19 +15,23 @@
         android:layout_height="wrap_content"
         android:padding="16dp">
 
+        <!-- Active Checkmark Icon -->
         <ImageView
             android:id="@+id/imgCheck"
             android:layout_width="24dp"
             android:layout_height="24dp"
+            android:layout_alignParentStart="true"
             android:layout_centerVertical="true"
             android:src="@android:drawable/checkbox_on_background"
             app:tint="#22C55E" />
 
+        <!-- Server Name & Endpoint -->
         <LinearLayout
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_centerVertical="true"
             android:layout_marginStart="12dp"
+            android:layout_marginEnd="8dp"
             android:layout_toStartOf="@id/btnDelete"
             android:layout_toEndOf="@id/imgCheck"
             android:orientation="vertical">
@@ -51,6 +55,7 @@
                 android:textSize="12sp" />
         </LinearLayout>
 
+        <!-- Delete Trash Icon -->
         <ImageView
             android:id="@+id/btnDelete"
             android:layout_width="28dp"
