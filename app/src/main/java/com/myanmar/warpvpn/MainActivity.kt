@@ -7,15 +7,18 @@ import android.net.Uri
 import android.net.VpnService
 import android.os.Bundle
 import android.view.View
+import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.switchmaterial.SwitchMaterial
@@ -35,6 +38,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var drawerLayout: DrawerLayout
     private lateinit var btnMenu: ImageView
     private lateinit var btnConnectCard: MaterialCardView
+    private lateinit var cardServer: MaterialCardView
+    private lateinit var tvServerName: TextView
     private lateinit var imgPower: ImageView
     private lateinit var tvStatus: TextView
     private lateinit var tvLogs: TextView
@@ -68,7 +73,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
         val isDark = prefs.getBoolean("DARK_MODE", true)
-        
+
         if (isDark) {
             AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
         } else {
@@ -81,6 +86,8 @@ class MainActivity : AppCompatActivity() {
         drawerLayout = findViewById(R.id.drawerLayout)
         btnMenu = findViewById(R.id.btnMenu)
         btnConnectCard = findViewById(R.id.btnConnectCard)
+        cardServer = findViewById(R.id.cardServer)
+        tvServerName = findViewById(R.id.tvServerName)
         imgPower = findViewById(R.id.imgPower)
         tvStatus = findViewById(R.id.tvStatus)
         tvLogs = findViewById(R.id.tvLogs)
@@ -91,14 +98,18 @@ class MainActivity : AppCompatActivity() {
         switchPing = findViewById(R.id.switchPing)
         btnRestoreDefaults = findViewById(R.id.btnRestoreDefaults)
         tvTelegram = findViewById(R.id.tvTelegram)
-        
+
         switchDarkMode.isChecked = isDark
         switchLogs.isChecked = prefs.getBoolean("SHOW_LOGS", true)
         switchPing.isChecked = prefs.getBoolean("AUTO_PING", true)
 
         cardLogs.visibility = if (switchLogs.isChecked) View.VISIBLE else View.GONE
 
-        // Dark Mode Switch Logic
+        // WARP Server Card နှိပ်ပါက Select Location Bottom Sheet ပေါ်ရန်
+        cardServer.setOnClickListener {
+            showSelectLocationBottomSheet()
+        }
+
         switchDarkMode.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean("DARK_MODE", isChecked).apply()
             if (isChecked) {
@@ -108,13 +119,11 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Connection Logs Switch Logic
         switchLogs.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean("SHOW_LOGS", isChecked).apply()
             cardLogs.visibility = if (isChecked) View.VISIBLE else View.GONE
         }
 
-        // Auto Ping Switch Logic
         switchPing.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean("AUTO_PING", isChecked).apply()
             if (isConnected) {
@@ -122,12 +131,10 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Restore Defaults Button Logic
         btnRestoreDefaults.setOnClickListener {
             prefs.edit().clear().apply()
             Toast.makeText(this, "Defaults Restored!", Toast.LENGTH_SHORT).show()
-            appendLog("Restored default settings. Memory cleared.")
-            
+            appendLog("Restored default settings. Saved Config cleared.")
             AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
         }
 
@@ -147,6 +154,80 @@ class MainActivity : AppCompatActivity() {
                 disconnectVpn()
             }
         }
+    }
+
+    // --- Bottom Sheet Display (Select Location & Delete & Import) ---
+    private fun showSelectLocationBottomSheet() {
+        val bottomSheet = BottomSheetDialog(this)
+        val dialogView = layoutInflater.inflate(R.layout.dialog_select_location, null)
+        bottomSheet.setContentView(dialogView)
+
+        val btnAddConfig = dialogView.findViewById<MaterialCardView>(R.id.btnAddConfig)
+        val btnDeleteConfig = dialogView.findViewById<ImageView>(R.id.btnDeleteConfig)
+        val tvConfigTitle = dialogView.findViewById<TextView>(R.id.tvConfigTitle)
+        val tvConfigSubtitle = dialogView.findViewById<TextView>(R.id.tvConfigSubtitle)
+
+        val savedConfig = getSavedConfig()
+        if (savedConfig != null) {
+            tvConfigTitle.text = "WARP Custom / Saved Config"
+            tvConfigSubtitle.text = "Saved WireGuard Config Active"
+        } else {
+            tvConfigTitle.text = "WARP Auto Clean IP"
+            tvConfigSubtitle.text = "162.159.*****"
+        }
+
+        // Delete Config Event
+        btnDeleteConfig.setOnClickListener {
+            if (isConnected) {
+                Toast.makeText(this, "Please disconnect VPN first!", Toast.LENGTH_SHORT).show()
+            } else {
+                deleteSavedConfig()
+                appendLog("Config Deleted. Will generate new config on next connect.")
+                Toast.makeText(this, "Config Deleted!", Toast.LENGTH_SHORT).show()
+                bottomSheet.dismiss()
+            }
+        }
+
+        // Add Config (+) Click Event
+        btnAddConfig.setOnClickListener {
+            bottomSheet.dismiss()
+            showImportConfigDialog()
+        }
+
+        bottomSheet.show()
+    }
+
+    // --- Import Custom WireGuard Config Dialog ---
+    private fun showImportConfigDialog() {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_add_server, null)
+        val etConfigInput = dialogView.findViewById<EditText>(R.id.etConfigInput)
+        val btnCancel = dialogView.findViewById<MaterialButton>(R.id.btnCancel)
+        val btnImport = dialogView.findViewById<MaterialButton>(R.id.btnImport)
+
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .create()
+
+        btnCancel.setOnClickListener { dialog.dismiss() }
+
+        btnImport.setOnClickListener {
+            val inputText = etConfigInput.text.toString().trim()
+            if (inputText.isNotEmpty() && inputText.contains("[Interface]")) {
+                try {
+                    Config.parse(ByteArrayInputStream(inputText.toByteArray()))
+                    saveConfig(inputText)
+                    appendLog("Custom WireGuard Config Imported Successfully!")
+                    Toast.makeText(this, "Config Imported Successfully!", Toast.LENGTH_SHORT).show()
+                    dialog.dismiss()
+                } catch (e: Exception) {
+                    Toast.makeText(this, "Invalid Config Format!", Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                Toast.makeText(this, "Please paste valid WireGuard Config!", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        dialog.show()
     }
 
     private fun appendLog(message: String) {
@@ -287,6 +368,11 @@ class MainActivity : AppCompatActivity() {
     private fun getSavedConfig(): String? {
         val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
         return prefs.getString("WARP_CONFIG", null)
+    }
+
+    private fun deleteSavedConfig() {
+        val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
+        prefs.edit().remove("WARP_CONFIG").apply()
     }
 
     class WgTunnel : com.wireguard.android.backend.Tunnel {
