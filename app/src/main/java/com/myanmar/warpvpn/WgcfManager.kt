@@ -23,14 +23,14 @@ class WgcfManager {
         .retryOnConnectionFailure(true)
         .build()
 
-    // Cloudflare API Base URLs (Multiple versions for fallback)
+    // Cloudflare API Base URLs
     private val cfApiBases = listOf(
         "https://api.cloudflareclient.com/v0i1909051800",
         "https://api.cloudflareclient.com/v0a2109151800",
         "https://api.cloudflareclient.com/v0a2409051800"
     )
 
-    // WARP Endpoints (Multiple IPs for fallback)
+    // WARP Endpoints
     private val warpEndpoints = listOf(
         "162.159.192.1",
         "162.159.193.1",
@@ -41,12 +41,7 @@ class WgcfManager {
 
     private val customApiUrl = "https://nyeinkokoaung.alwaysdata.net/wg/api.php"
 
-    /**
-     * Main function to register and get WARP config
-     * @param engineMode: "CF_DIRECT" or "CUSTOM_API"
-     * @param maxRetries: Number of retry attempts
-     * @return WireGuard URI string
-     */
+    // Main function to register and get WARP config
     suspend fun registerAndGetConfig(
         engineMode: String = "CF_DIRECT",
         maxRetries: Int = 3
@@ -63,7 +58,7 @@ class WgcfManager {
             } catch (e: Exception) {
                 lastException = e
                 if (attempt < maxRetries - 1) {
-                    delay(2000L * (attempt + 1)) // Exponential backoff
+                    delay(2000L * (attempt + 1))
                 }
             }
         }
@@ -71,9 +66,7 @@ class WgcfManager {
         throw lastException ?: Exception("All retry attempts failed")
     }
 
-    /**
-     * Fetch config from Cloudflare API with multiple endpoint fallback
-     */
+    // Fetch config from Cloudflare API with multiple endpoint fallback
     private fun fetchFromCloudflareApiWithFallback(): String {
         var lastException: Exception? = null
 
@@ -83,8 +76,6 @@ class WgcfManager {
                     return fetchFromCloudflareApi(apiBase, endpoint)
                 } catch (e: Exception) {
                     lastException = e
-                    // Log and continue to next endpoint
-                    println("Failed with API: $apiBase, Endpoint: $endpoint - ${e.message}")
                 }
             }
         }
@@ -96,15 +87,12 @@ class WgcfManager {
      * Fetch config from specific Cloudflare API and endpoint
      */
     private fun fetchFromCloudflareApi(apiBase: String, endpoint: String): String {
-        // Generate WireGuard key pair
         val keyPair = KeyPair()
         val privateKey = keyPair.privateKey.toBase64()
         val publicKey = keyPair.publicKey.toBase64()
 
-        // Generate unique installation ID
         val installId = UUID.randomUUID().toString()
 
-        // Build registration JSON
         val regJson = JSONObject().apply {
             put("key", publicKey)
             put("install_id", installId)
@@ -115,7 +103,6 @@ class WgcfManager {
             put("locale", "en_US")
         }
 
-        // Create registration request
         val regRequest = Request.Builder()
             .url("$apiBase/reg")
             .header("User-Agent", "okhttp/3.12.1")
@@ -124,7 +111,6 @@ class WgcfManager {
             .post(regJson.toString().toRequestBody("application/json".toMediaType()))
             .build()
 
-        // Execute request
         val response = client.newCall(regRequest).execute()
         val responseData = response.body?.string() ?: throw Exception("Empty response from Cloudflare API")
 
@@ -132,7 +118,6 @@ class WgcfManager {
             throw Exception("Cloudflare API error: ${response.code} - ${response.message}")
         }
 
-        // Parse response
         val rootJson = JSONObject(responseData)
         val result = if (rootJson.has("result") && !rootJson.isNull("result")) {
             rootJson.getJSONObject("result")
@@ -140,7 +125,6 @@ class WgcfManager {
             rootJson
         }
 
-        // Extract config data
         val config = result.getJSONObject("config")
         val peers = config.getJSONArray("peers").getJSONObject(0)
         val serverPublicKey = peers.getString("public_key")
@@ -150,14 +134,14 @@ class WgcfManager {
         val ipv4 = addresses.getString("v4")
         val ipv6 = addresses.getString("v6")
 
-        // Build WireGuard URI without reserved field (to avoid parser errors)
-        return buildWireGuardUri(
+        // Return as RAW WireGuard Config (not URI)
+        return buildRawWireGuardConfig(
             privateKey = privateKey,
             endpoint = endpoint,
             port = "500",
             address = "$ipv4/32, $ipv6/128",
             publicKey = serverPublicKey,
-            mtu = "1280"
+            dns = "1.1.1.1, 1.0.0.1"
         )
     }
 
@@ -194,90 +178,67 @@ class WgcfManager {
         val clientPrivateKey = configObj.getString("private_key").trim()
         val rawAddress = configObj.getString("address").trim()
         val serverPublicKey = configObj.getString("public_key").trim()
-        
-        // Get reserved field (optional)
-        val reservedStr = configObj.optString("reserved", "").trim()
-
-        // Format address properly
-        val formattedAddress = if (rawAddress.contains(",") && !rawAddress.contains(", ")) {
-            rawAddress.replace(",", ", ")
-        } else {
-            rawAddress
-        }
 
         // Find working endpoint
         val endpoint = findWorkingEndpoint()
 
-        // Build WireGuard URI
-        return buildWireGuardUri(
+        // Return as RAW WireGuard Config
+        return buildRawWireGuardConfig(
             privateKey = clientPrivateKey,
             endpoint = endpoint,
             port = "500",
-            address = formattedAddress,
+            address = rawAddress,
             publicKey = serverPublicKey,
-            mtu = "1280",
-            reserved = if (reservedStr.isNotEmpty()) reservedStr else null
+            dns = "1.1.1.1, 1.0.0.1"
         )
     }
 
     /**
-     * Build WireGuard URI string
+     * Build RAW WireGuard Config (not URI)
      */
-    private fun buildWireGuardUri(
+    private fun buildRawWireGuardConfig(
         privateKey: String,
         endpoint: String,
         port: String,
         address: String,
         publicKey: String,
-        mtu: String,
-        reserved: String? = null
+        dns: String
     ): String {
-        val encodedPrivateKey = URLEncoder.encode(privateKey, "UTF-8")
-        val encodedAddress = URLEncoder.encode(address, "UTF-8")
-        val encodedPublicKey = URLEncoder.encode(publicKey, "UTF-8")
-        
-        // Build base URI
-        var uri = "wireguard://$encodedPrivateKey@$endpoint:$port"
-        
-        // Build query parameters
-        val queryParams = mutableListOf<String>()
-        queryParams.add("address=$encodedAddress")
-        queryParams.add("publickey=$encodedPublicKey")
-        queryParams.add("mtu=$mtu")
-        
-        // Add reserved if provided (only for custom API)
-        if (reserved != null && reserved.isNotEmpty()) {
-            val encodedReserved = URLEncoder.encode(reserved, "UTF-8")
-            queryParams.add("reserved=$encodedReserved")
+        // Format address properly
+        val formattedAddress = if (address.contains(",") && !address.contains(", ")) {
+            address.replace(",", ", ")
+        } else {
+            address
         }
         
-        uri += "?" + queryParams.joinToString("&")
-        
-        // Add fragment
-        uri += "#WARP-AUTO"
-        
-        return uri
+        return """
+            [Interface]
+            PrivateKey = $privateKey
+            Address = $formattedAddress
+            DNS = $dns
+            MTU = 1280
+            
+            [Peer]
+            PublicKey = $publicKey
+            Endpoint = $endpoint:$port
+            AllowedIPs = 0.0.0.0/0, ::/0
+        """.trimIndent()
     }
 
     /**
      * Find working endpoint by testing connectivity
      */
     private fun findWorkingEndpoint(): String {
-        // Try all endpoints
         for (endpoint in warpEndpoints) {
             try {
-                // Use InetAddress to check reachability
                 val address = InetAddress.getByName(endpoint)
                 if (address.isReachable(3000)) {
                     return endpoint
                 }
             } catch (e: Exception) {
-                // Continue to next endpoint
                 continue
             }
         }
-        
-        // Return default if none work (will try fallback in MainActivity)
         return "162.159.195.1"
     }
 
