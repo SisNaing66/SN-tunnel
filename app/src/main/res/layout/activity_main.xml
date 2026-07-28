@@ -28,7 +28,7 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:clickable="true"
                 android:focusable="true"
-                android:src="@drawable/ic_menu_compass"
+                android:src="@drawable/menu"
                 app:tint="?attr/colorOnBackground" />
 
             <TextView
@@ -179,7 +179,7 @@
                             android:clickable="true"
                             android:focusable="true"
                             android:padding="2dp"
-                            android:src="@android:drawable/ic_menu_delete"
+                            android:src="@drawable/delete"
                             app:tint="#EF4444" />
 
                         <!-- Copy Logs Icon -->
@@ -192,7 +192,7 @@
                             android:clickable="true"
                             android:focusable="true"
                             android:padding="2dp"
-                            android:src="@android:drawable/ic_menu_send"
+                            android:src="@drawable/copy"
                             app:tint="#38BDF8" />
                     </LinearLayout>
                 </RelativeLayout>
