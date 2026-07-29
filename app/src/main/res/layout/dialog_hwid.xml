@@ -1,36 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://com.android.material"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:background="?attr/colorSurface"
     android:orientation="vertical"
-    android:padding="20dp"
-    android:background="#1E293B">
+    android:padding="20dp">
 
+    <!-- Title -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Device Hardware ID"
-        android:textColor="#FFFFFF"
+        android:textColor="?attr/colorOnSurface"
         android:textSize="18sp"
         android:textStyle="bold" />
 
+    <!-- HWID Box -->
     <TextView
         android:id="@+id/tvHwidValue"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:background="#0F172A"
+        android:layout_marginTop="14dp"
+        android:background="?android:attr/colorBackground"
+        android:fontFamily="monospace"
         android:padding="12dp"
         android:textColor="#38BDF8"
-        android:textSize="14sp"
         android:textIsSelectable="true"
-        android:fontFamily="monospace" />
+        android:textSize="14sp"
+        android:textStyle="bold" />
 
+    <!-- Buttons Layout -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="18dp"
         android:orientation="horizontal">
 
         <com.google.android.material.button.MaterialButton
@@ -38,10 +42,11 @@
             style="@style/Widget.MaterialComponents.Button.OutlinedButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
             android:layout_marginEnd="8dp"
+            android:layout_weight="1"
             android:text="Copy"
             android:textColor="#38BDF8"
+            app:cornerRadius="10dp"
             app:strokeColor="#38BDF8" />
 
         <com.google.android.material.button.MaterialButton
@@ -49,9 +54,11 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Share"
             android:backgroundTint="#38BDF8"
-            android:textColor="#0F172A" />
+            android:text="Share"
+            android:textColor="#0F172A"
+            android:textStyle="bold"
+            app:cornerRadius="10dp" />
     </LinearLayout>
 
 </LinearLayout>
