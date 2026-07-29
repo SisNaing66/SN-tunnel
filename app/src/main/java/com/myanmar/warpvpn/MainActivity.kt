@@ -962,6 +962,21 @@ class MainActivity : AppCompatActivity() {
         pingJob = null
     }
 
+    private fun animateDot(view: View, startAnimation: Boolean) {
+        if (startAnimation) {
+            if (view.animation == null) {
+                val anim = android.view.animation.AlphaAnimation(0.3f, 1.0f).apply {
+                    duration = 600
+                    repeatMode = android.view.animation.Animation.REVERSE
+                    repeatCount = android.view.animation.Animation.INFINITE
+                }
+                view.startAnimation(anim)
+            }
+        } else {
+            view.clearAnimation()
+        }
+    }
+
     private suspend fun runSinglePing() = withContext(Dispatchers.IO) {
         try {
             if (!isConnected) return@withContext
@@ -981,21 +996,24 @@ class MainActivity : AppCompatActivity() {
 
             val logMessage = "🏓 Ping -> CF: $cfResult | FB: $fbResult"
             val notiMessage = "CF: $cfResult | FB: $fbResult"
-
+            
             appendLog(logMessage)
 
             withContext(Dispatchers.Main) {
                 if (isConnected) {
                     tvCfPing.text = cfResult
                     tvFbPing.text = fbResult
-                    
+
                     tvCfDot.text = if (cfReachable) "🟢 " else "⚪ "
                     tvFbDot.text = if (fbReachable) "🟢 " else "⚪ "
+
+                    animateDot(tvCfDot, cfReachable)
+                    animateDot(tvFbDot, fbReachable)
 
                     notificationHelper.updateNotification(notiMessage)
                 }
             }
-
+        
         } catch (e: Exception) {
             if (isActive) {
                 appendLog("Ping Error: ${e.localizedMessage}")
@@ -1004,6 +1022,10 @@ class MainActivity : AppCompatActivity() {
                     tvFbPing.text = "N/A"
                     tvCfDot.text = "⚪ "
                     tvFbDot.text = "⚪ "
+                    
+                    animateDot(tvCfDot, false)
+                    animateDot(tvFbDot, false)
+
                     notificationHelper.updateNotification("Ping Error")
                 }
             }
@@ -1025,6 +1047,9 @@ class MainActivity : AppCompatActivity() {
             tvFbPing.text = "N/A"
             tvCfDot.text = "⚪ "
             tvFbDot.text = "⚪ "
+
+            animateDot(tvCfDot, false)
+            animateDot(tvFbDot, false)
 
             notificationHelper.cancelNotification()
         }
