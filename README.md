@@ -16,7 +16,7 @@
   - **Cloudflare Direct API:** Cloudflare WARP Server မှ တိုက်ရိုက် Config ရယူခြင်း။
   - **Custom PHP Backup API:** Direct API အလုပ်မလုပ်ချိန်များတွင် Backup Server များမှ Auto Fetch ပြုလုပ်ခြင်း။
 - 🛡️ **WireGuard Native Integration:** WireGuard GoBackend SDK ကို တိုက်ရိုက် အသုံးပြုထားသဖြင့် မြန်ဆန်ပြီး Battery စားသုံးမှု သက်သာခြင်း။
-- 🔑 **Reserved Bytes & IPv6 Compatibility:** ISP များတွင် Ping Timeout ဖြစ်ပွားခြင်းမှ ကာကွယ်ရန် Cloudflare Client ID Bytes (`Reserved = 0,0,0`) ဖြင့် အလိုအလျောက် Binding ပြုလုပ်ပေးခြင်း။
+- 🔑 **Reserved Bytes & IPv6 Compatibility:** ISP များတွင် Ping Timeout ဖြစ်ပွားခြင်းမှ ကာကွယ်ထားပါသည်။
 - 🔗 **WireGuard URI Support:** `wireguard://` URI Link များကို အလွယ်တကူ Copy / Paste ပြုလုပ်၍ Config များ Import သွင်းနိုင်ခြင်း။
 - 🌐 **Custom DNS Switcher:** Cloudflare (1.1.1.1) နှင့် Google (8.8.8.8) DNS များကို စိတ်ကြိုက် ပြောင်းလဲနိုင်ခြင်း။
 - 📊 **Real-time Latency Ping:** ချိတ်ဆက်ထားစဉ် 1.1.1.1 သို့ Latency Ping ms အား ပုံမှန် စစ်ဆေးပေးခြင်း။
