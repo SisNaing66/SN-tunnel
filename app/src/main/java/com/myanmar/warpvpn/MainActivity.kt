@@ -89,14 +89,20 @@ class MainActivity : AppCompatActivity() {
     private lateinit var rbDnsGoogle: RadioButton
     private lateinit var btnRestoreDefaults: MaterialButton
     private lateinit var tvTelegram: TextView
-
-    // HWID and Split Tunneling Views
+    
     private lateinit var cardHwid: MaterialCardView
     private lateinit var tvHwid: TextView
     private lateinit var switchSplitTunnel: SwitchMaterial
+    
+    private lateinit var tvActiveSinceTime: TextView
+    private lateinit var btnTestPing: TextView
+    private lateinit var tvCfPing: TextView
+    private lateinit var tvFbPing: TextView
 
     private var isConnected = false
     private var pingJob: Job? = null
+    private var timerJob: Job? = null
+    private var connectStartTime: Long = 0
     private var pendingConfigStr: String? = null
 
     private val backend by lazy { GoBackend(applicationContext) }
@@ -138,7 +144,7 @@ class MainActivity : AppCompatActivity() {
 
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        
+
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
@@ -185,6 +191,12 @@ class MainActivity : AppCompatActivity() {
         tvHwid = findViewById(R.id.tvHwid)
         switchSplitTunnel = findViewById(R.id.switchSplitTunnel)
 
+        // Binding Active Since & Latency Views
+        tvActiveSinceTime = findViewById(R.id.tvActiveSinceTime)
+        btnTestPing = findViewById(R.id.btnTestPing)
+        tvCfPing = findViewById(R.id.tvCfPing)
+        tvFbPing = findViewById(R.id.tvFbPing)
+
         // Load saved preferences
         switchDarkMode.isChecked = isDark
         switchLogs.isChecked = prefs.getBoolean("SHOW_LOGS", true)
@@ -198,7 +210,7 @@ class MainActivity : AppCompatActivity() {
         setEngineSelectionUI(savedEngine == "CF_DIRECT")
 
         setupListeners()
-        
+
         when (prefs.getString("DNS_SETTING", "DEFAULT")) {
             "CLOUDFLARE" -> rbDnsCloudflare.isChecked = true
             "GOOGLE" -> rbDnsGoogle.isChecked = true
@@ -208,11 +220,19 @@ class MainActivity : AppCompatActivity() {
         cardLogs.visibility = if (switchLogs.isChecked) View.VISIBLE else View.GONE
 
         updateActiveServerName()
-        
+
         appendLog("WARP TUNNEL App Started")
         appendLog("Ready to connect...")
 
         checkNotificationPermission()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
+        if (::switchSplitTunnel.isInitialized) {
+            switchSplitTunnel.isChecked = prefs.getBoolean("SPLIT_TUNNEL_ENABLED", false)
+        }
     }
 
     private fun getDeviceHwid(): String {
@@ -230,7 +250,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-    
+
     private fun setupListeners() {
         btnMenu.setOnClickListener {
             drawerLayout.openDrawer(GravityCompat.START)
@@ -250,6 +270,16 @@ class MainActivity : AppCompatActivity() {
 
         cardHwid.setOnClickListener {
             showHwidDialog(getDeviceHwid())
+        }
+
+        btnTestPing.setOnClickListener {
+            if (isConnected) {
+                lifecycleScope.launch(Dispatchers.IO) {
+                    runSinglePing()
+                }
+            } else {
+                Toast.makeText(this, "Please connect to VPN first!", Toast.LENGTH_SHORT).show()
+            }
         }
 
         switchSplitTunnel.setOnCheckedChangeListener { _, isChecked ->
@@ -369,7 +399,7 @@ class MainActivity : AppCompatActivity() {
     private fun showRestoreDefaultsDialog() {
         val isDark = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
         val buttonColor = if (isDark) Color.parseColor("#38BDF8") else Color.parseColor("#0284C7")
-        
+
         val dialogView = layoutInflater.inflate(R.layout.dialog_custom_content, null)
         val tvMessage = dialogView.findViewById<TextView>(R.id.tvDialogMessage)
         tvMessage.text = "Are you sure you want to reset all settings, configs, and preferences to default?"
@@ -404,11 +434,11 @@ class MainActivity : AppCompatActivity() {
         dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(buttonColor)
         dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(buttonColor)
     }
-    
+
     private fun showExitDialog() {
         val isDark = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
         val buttonColor = if (isDark) Color.parseColor("#38BDF8") else Color.parseColor("#0284C7")
-        
+
         val dialogView = layoutInflater.inflate(R.layout.dialog_custom_content, null)
         val tvMessage = dialogView.findViewById<TextView>(R.id.tvDialogMessage)
         tvMessage.text = "Choose whether to minimize to background or exit the app completely."
@@ -557,24 +587,24 @@ class MainActivity : AppCompatActivity() {
     private fun parseWireGuardUri(uriString: String): String {
         try {
             val cleanUri = uriString.replace("wireguard://", "")
-            
+
             val atIndex = cleanUri.indexOf('@')
             if (atIndex == -1) throw Exception("Missing @")
-            
+
             val privateKey = cleanUri.substring(0, atIndex)
             val rest = cleanUri.substring(atIndex + 1)
-            
+
             val questionIndex = rest.indexOf('?')
             if (questionIndex == -1) throw Exception("Missing ?")
-            
+
             val endpointPart = rest.substring(0, questionIndex)
             val queryPart = rest.substring(questionIndex + 1)
-            
+
             val endpointParts = endpointPart.split(':')
             if (endpointParts.size != 2) throw Exception("Invalid endpoint")
             val endpointHost = endpointParts[0]
             val endpointPort = endpointParts[1]
-            
+
             val params = mutableMapOf<String, String>()
             queryPart.split('&').forEach { param ->
                 val parts = param.split('=')
@@ -584,11 +614,11 @@ class MainActivity : AppCompatActivity() {
                     params[key] = value
                 }
             }
-            
+
             val address = params["address"] ?: throw Exception("Missing address")
             val publicKey = params["publickey"] ?: throw Exception("Missing publickey")
             val mtu = params["mtu"] ?: "1280"
-            
+
             return buildRawConfig(
                 privateKey = URLDecoder.decode(privateKey, "UTF-8"),
                 endpoint = "$endpointHost:$endpointPort",
@@ -596,7 +626,7 @@ class MainActivity : AppCompatActivity() {
                 publicKey = publicKey,
                 mtu = mtu
             )
-            
+
         } catch (e: Exception) {
             throw Exception("Failed to parse WireGuard URI: ${e.message}")
         }
@@ -614,14 +644,14 @@ class MainActivity : AppCompatActivity() {
         } else {
             address
         }
-        
+
         return """
             [Interface]
             PrivateKey = $privateKey
             Address = $formattedAddress
             DNS = 1.1.1.1, 1.0.0.1
             MTU = $mtu
-            
+
             [Peer]
             PublicKey = $publicKey
             Endpoint = $endpoint
@@ -655,14 +685,14 @@ class MainActivity : AppCompatActivity() {
         runOnUiThread {
             val timestamp = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
             tvLogs.append("[$timestamp] $message\n")
-            
+
             tvLogs.post {
                 val scrollAmount = tvLogs.layout?.getLineTop(tvLogs.lineCount) ?: 0
                 tvLogs.scrollTo(0, maxOf(0, scrollAmount - tvLogs.height))
             }
         }
     }
-    
+
     private fun prepareAndConnectVpn() {
         tvStatus.text = "CONNECTING..."
         btnConnectCard.setStrokeColor(Color.parseColor("#F59E0B"))
@@ -679,7 +709,7 @@ class MainActivity : AppCompatActivity() {
 
                     appendLog("No config found. Requesting NEW Config via Engine: $engineMode...")
                     val wgcf = WgcfManager()
-                    
+
                     try {
                         configStr = wgcf.registerAndGetConfig(engineMode)
                         appendLog("Config received successfully!")
@@ -691,21 +721,21 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     val newModel = ConfigModel(
-                        "warp_${System.currentTimeMillis()}", 
-                        "WARP Auto Clean IP", 
-                        configStr, 
-                        extractEndpoint(configStr), 
+                        "warp_${System.currentTimeMillis()}",
+                        "WARP Auto Clean IP",
+                        configStr,
+                        extractEndpoint(configStr),
                         true
                     )
                     saveNewConfig(newModel)
-                    appendLog("NEW WARP Config saved!")
+                    appendLog("NEW WARP Config Saved!")
                 } else {
                     configStr = selectedModel.content
                     appendLog("Using Active Config [${selectedModel.name}]...")
                 }
 
                 configStr = applyCustomDnsToConfig(configStr)
-                
+
                 try {
                     Config.parse(ByteArrayInputStream(configStr.toByteArray()))
                     appendLog("✅ Config validation successful")
@@ -713,9 +743,9 @@ class MainActivity : AppCompatActivity() {
                     appendLog("❌ Config validation failed: ${e.message}")
                     throw Exception("Invalid config: ${e.message}")
                 }
-                
+
                 pendingConfigStr = configStr
-                
+
                 withContext(Dispatchers.Main) {
                     val intent = VpnService.prepare(this@MainActivity)
                     if (intent != null) {
@@ -737,7 +767,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-    
+
     private fun connectVpnWithPendingConfig() {
         val configStr = pendingConfigStr ?: return
 
@@ -749,9 +779,9 @@ class MainActivity : AppCompatActivity() {
                 val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
                 val isSplitEnabled = prefs.getBoolean("SPLIT_TUNNEL_ENABLED", false)
                 val excludedApps = prefs.getStringSet("EXCLUDED_APPS", emptySet()) ?: emptySet()
-                
+
                 val origInterface = parsedConfig.`interface`
-                
+
                 val interfaceBuilder = com.wireguard.config.Interface.Builder()
                     .setKeyPair(origInterface.keyPair)
                     .addAddresses(origInterface.addresses)
@@ -759,12 +789,12 @@ class MainActivity : AppCompatActivity() {
 
                 origInterface.listenPort.ifPresent { interfaceBuilder.setListenPort(it) }
                 origInterface.mtu.ifPresent { interfaceBuilder.setMtu(it) }
-                
+
                 if (isSplitEnabled && excludedApps.isNotEmpty()) {
                     interfaceBuilder.excludeApplications(excludedApps)
                     appendLog("Split Tunneling Active: Excluded ${excludedApps.size} apps.")
                 }
-                
+
                 val finalWgConfig = Config.Builder()
                     .setInterface(interfaceBuilder.build())
                     .addPeers(parsedConfig.peers)
@@ -774,15 +804,19 @@ class MainActivity : AppCompatActivity() {
 
                 withContext(Dispatchers.Main) {
                     isConnected = true
+                    connectStartTime = System.currentTimeMillis()
+
                     tvStatus.text = "CONNECTED"
                     tvStatus.setTextColor(Color.parseColor("#4ADE80"))
                     btnConnectCard.setStrokeColor(Color.parseColor("#4ADE80"))
                     imgPower.setColorFilter(Color.parseColor("#4ADE80"))
 
-                    Toast.makeText(this@MainActivity, "WARP TUNNEL Connected Successfully!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, "Warp Tunnel Connected!", Toast.LENGTH_SHORT).show()
                     appendLog("✅ Connected to WARP TUNNEL!")
 
                     notificationHelper.updateNotification("Measuring...")
+                    
+                    startActiveSinceTimer()
                     startPingManager()
                 }
 
@@ -801,6 +835,7 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch(Dispatchers.IO) {
             try {
                 stopPingManager()
+                stopActiveSinceTimer()
                 appendLog("Stopping WARP Tunnel...")
                 backend.setState(tunnel, com.wireguard.android.backend.Tunnel.State.DOWN, null)
 
@@ -815,6 +850,31 @@ class MainActivity : AppCompatActivity() {
                     resetUi()
                 }
             }
+        }
+    }
+
+    private fun startActiveSinceTimer() {
+        stopActiveSinceTimer()
+        timerJob = lifecycleScope.launch(Dispatchers.Main) {
+            while (isActive && isConnected) {
+                val elapsedSeconds = (System.currentTimeMillis() - connectStartTime) / 1000
+                tvActiveSinceTime.text = formatElapsedTime(elapsedSeconds)
+                delay(1000)
+            }
+        }
+    }
+
+    private fun stopActiveSinceTimer() {
+        timerJob?.cancel()
+        timerJob = null
+        tvActiveSinceTime.text = "Not Connected"
+    }
+
+    private fun formatElapsedTime(seconds: Long): String {
+        return when {
+            seconds < 60 -> "$seconds seconds ago"
+            seconds < 3600 -> "${seconds / 60} minutes ago"
+            else -> "${seconds / 3600} hours ago"
         }
     }
 
@@ -859,12 +919,16 @@ class MainActivity : AppCompatActivity() {
             appendLog(logMessage)
 
             withContext(Dispatchers.Main) {
+                tvCfPing.text = cfResult
+                tvFbPing.text = fbResult
                 notificationHelper.updateNotification(notiMessage)
             }
 
         } catch (e: Exception) {
             appendLog("Ping Error: ${e.localizedMessage}")
             withContext(Dispatchers.Main) {
+                tvCfPing.text = "N/A"
+                tvFbPing.text = "N/A"
                 notificationHelper.updateNotification("Ping Error")
             }
         }
@@ -872,12 +936,17 @@ class MainActivity : AppCompatActivity() {
 
     private fun resetUi() {
         stopPingManager()
+        stopActiveSinceTimer()
+
         isConnected = false
         tvStatus.text = "TAP TO CONNECT"
         tvStatus.setTextColor(Color.parseColor("#94A3B8"))
         btnConnectCard.setStrokeColor(Color.parseColor("#334155"))
         imgPower.setColorFilter(Color.parseColor("#94A3B8"))
-        
+
+        tvCfPing.text = "N/A"
+        tvFbPing.text = "N/A"
+
         notificationHelper.cancelNotification()
     }
 
@@ -901,8 +970,8 @@ class MainActivity : AppCompatActivity() {
                     )
                 )
             }
-        } catch (e: Exception) { 
-            e.printStackTrace() 
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
 
         if (list.isNotEmpty() && list.none { it.isSelected }) {
