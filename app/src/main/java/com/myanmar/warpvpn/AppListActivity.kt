@@ -5,10 +5,13 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.CheckBox
+import android.widget.EditText
 import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -32,25 +35,66 @@ class AppListActivity : AppCompatActivity() {
 
     private lateinit var rvApps: RecyclerView
     private lateinit var btnSave: MaterialButton
+    private lateinit var btnBack: ImageView
+    private lateinit var etSearchApp: EditText
     private lateinit var progressBar: ProgressBar
-    private val appList = mutableListOf<AppModel>()
+
+    private val fullAppList = mutableListOf<AppModel>()
+    private val filteredAppList = mutableListOf<AppModel>()
     private lateinit var adapter: AppAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_app_list)
 
+        btnBack = findViewById(R.id.btnBack)
         rvApps = findViewById(R.id.rvApps)
         btnSave = findViewById(R.id.btnSave)
+        etSearchApp = findViewById(R.id.etSearchApp)
         progressBar = findViewById(R.id.progressBar)
 
         rvApps.layoutManager = LinearLayoutManager(this)
 
-        loadInstalledApps()
+        btnBack.setOnClickListener {
+            finish()
+        }
 
         btnSave.setOnClickListener {
             saveExcludedApps()
             finish()
+        }
+        
+        etSearchApp.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                filterApps(s.toString())
+            }
+
+            override fun afterTextChanged(s: Editable?) {}
+        })
+
+        loadInstalledApps()
+    }
+
+    private fun filterApps(query: String) {
+        val cleanQuery = query.trim().lowercase()
+        filteredAppList.clear()
+
+        if (cleanQuery.isEmpty()) {
+            filteredAppList.addAll(fullAppList)
+        } else {
+            for (app in fullAppList) {
+                if (app.appName.lowercase().contains(cleanQuery) ||
+                    app.packageName.lowercase().contains(cleanQuery)
+                ) {
+                    filteredAppList.add(app)
+                }
+            }
+        }
+
+        if (::adapter.isInitialized) {
+            adapter.notifyDataSetChanged()
         }
     }
 
@@ -65,7 +109,9 @@ class AppListActivity : AppCompatActivity() {
             val tempInfoList = mutableListOf<AppModel>()
 
             for (appInfo in installedApps) {
-                if ((appInfo.flags and ApplicationInfo.FLAG_SYSTEM) == 0 || appInfo.packageName == "com.google.android.youtube") {
+                if ((appInfo.flags and ApplicationInfo.FLAG_SYSTEM) == 0 ||
+                    appInfo.packageName == "com.google.android.youtube"
+                ) {
                     val appName = pm.getApplicationLabel(appInfo).toString()
                     val icon = pm.getApplicationIcon(appInfo)
                     val isExcluded = excludedSet.contains(appInfo.packageName)
@@ -77,9 +123,13 @@ class AppListActivity : AppCompatActivity() {
             tempInfoList.sortBy { it.appName.lowercase() }
 
             withContext(Dispatchers.Main) {
-                appList.clear()
-                appList.addAll(tempInfoList)
-                adapter = AppAdapter(appList)
+                fullAppList.clear()
+                fullAppList.addAll(tempInfoList)
+
+                filteredAppList.clear()
+                filteredAppList.addAll(fullAppList)
+
+                adapter = AppAdapter(filteredAppList)
                 rvApps.adapter = adapter
                 progressBar.visibility = View.GONE
             }
@@ -87,12 +137,13 @@ class AppListActivity : AppCompatActivity() {
     }
 
     private fun saveExcludedApps() {
-        val excludedSet = appList.filter { it.isExcluded }.map { it.packageName }.toSet()
+        val excludedSet = fullAppList.filter { it.isExcluded }.map { it.packageName }.toSet()
         val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
         prefs.edit().putStringSet("EXCLUDED_APPS", excludedSet).apply()
     }
 
-    class AppAdapter(private val list: List<AppModel>) : RecyclerView.Adapter<AppAdapter.ViewHolder>() {
+    class AppAdapter(private val list: List<AppModel>) :
+        RecyclerView.Adapter<AppAdapter.ViewHolder>() {
 
         class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
             val imgIcon: ImageView = view.findViewById(R.id.imgAppIcon)
@@ -102,7 +153,8 @@ class AppListActivity : AppCompatActivity() {
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-            val view = LayoutInflater.from(parent.context).inflate(R.layout.item_app, parent, false)
+            val view =
+                LayoutInflater.from(parent.context).inflate(R.layout.item_app, parent, false)
             return ViewHolder(view)
         }
 
@@ -111,6 +163,8 @@ class AppListActivity : AppCompatActivity() {
             holder.tvName.text = item.appName
             holder.tvPackage.text = item.packageName
             holder.imgIcon.setImageDrawable(item.icon)
+            
+            holder.cbExclude.setOnCheckedChangeListener(null)
             holder.cbExclude.isChecked = item.isExcluded
 
             holder.itemView.setOnClickListener {
