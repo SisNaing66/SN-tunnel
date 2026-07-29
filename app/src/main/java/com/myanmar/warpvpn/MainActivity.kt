@@ -945,9 +945,9 @@ class MainActivity : AppCompatActivity() {
         val secs = seconds % 60
 
         return when {
-            hours > 0 -> "${hours}H ${minutes}M ${secs}S Ago"
-            minutes > 0 -> "${minutes}M ${secs}S Ago"
-            else -> "$seconds Seconds Ago"
+            hours > 0 -> "${hours}h ${minutes}m ${secs}s ago"
+            minutes > 0 -> "${minutes}m ${secs}s ago"
+            else -> "$seconds seconds ago"
         }
     }
 
