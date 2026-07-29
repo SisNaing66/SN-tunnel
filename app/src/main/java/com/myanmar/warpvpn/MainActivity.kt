@@ -206,8 +206,7 @@ class MainActivity : AppCompatActivity() {
         tvFbPing = findViewById(R.id.tvFbPing)
         tvCfDot = findViewById(R.id.tvCfDot)
         tvFbDot = findViewById(R.id.tvFbDot)
-
-        // Load saved preferences
+        
         switchDarkMode.isChecked = isDark
         switchLogs.isChecked = prefs.getBoolean("SHOW_LOGS", true)
         switchPing.isChecked = prefs.getBoolean("AUTO_PING", false)
@@ -231,8 +230,8 @@ class MainActivity : AppCompatActivity() {
 
         updateActiveServerName()
 
-        appendLog("WARP TUNNEL App Started")
-        appendLog("Ready to connect...")
+        appendLog("Warp Tunnel App Started")
+        appendLog("Ready To Connect...")
 
         checkNotificationPermission()
     }
@@ -276,7 +275,7 @@ class MainActivity : AppCompatActivity() {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/nkka404"))
             startActivity(intent)
         } catch (e: Exception) {
-            Toast.makeText(this, "Cannot open Telegram link", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Cannot Open Telegram Link", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -311,7 +310,7 @@ class MainActivity : AppCompatActivity() {
                     runSinglePing()
                 }
             } else {
-                Toast.makeText(this, "Please connect to VPN first!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Please Connect To VPN first!", Toast.LENGTH_SHORT).show()
             }
         }
 
@@ -358,11 +357,11 @@ class MainActivity : AppCompatActivity() {
                 else -> "DEFAULT"
             }
             prefs.edit().putString("DNS_SETTING", dnsType).apply()
-            appendLog("DNS Mode set to: $dnsType")
+            appendLog("DNS Mode Set To: $dnsType")
         }
 
         btnClearLogs.setOnClickListener {
-            tvLogs.text = "Logs cleared.\n"
+            tvLogs.text = "Logs Cleared.\n"
             Toast.makeText(this, "Logs Cleared", Toast.LENGTH_SHORT).show()
         }
 
@@ -370,21 +369,21 @@ class MainActivity : AppCompatActivity() {
             val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             val clip = ClipData.newPlainText("Connection Logs", tvLogs.text.toString())
             clipboard.setPrimaryClip(clip)
-            Toast.makeText(this, "Logs Copied to Clipboard!", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Logs Copied To Clipboard!", Toast.LENGTH_SHORT).show()
         }
 
         cardEngineCf.setOnClickListener {
             val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
             prefs.edit().putString("WARP_ENGINE", "CF_DIRECT").apply()
             setEngineSelectionUI(true)
-            appendLog("Engine set to Cloudflare Direct API")
+            appendLog("Engine Set To Cloudflare Direct API")
         }
 
         cardEngineCustom.setOnClickListener {
             val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
             prefs.edit().putString("WARP_ENGINE", "CUSTOM_API").apply()
             setEngineSelectionUI(false)
-            appendLog("Engine set to Custom Backup API")
+            appendLog("Engine Set To Custom Backup API")
         }
 
         btnRestoreDefaults.setOnClickListener {
@@ -451,7 +450,7 @@ class MainActivity : AppCompatActivity() {
                 rbDnsDefault.isChecked = true
                 setEngineSelectionUI(true)
 
-                updateLogsAndAdVisibility(true)
+                updateLogsAndAdVisibility(false)
                 updateActiveServerName()
                 appendLog("Restored all settings and configs to default.")
                 Toast.makeText(this, "All settings restored to defaults!", Toast.LENGTH_SHORT).show()
@@ -519,10 +518,27 @@ class MainActivity : AppCompatActivity() {
     private fun updateActiveServerName() {
         val selected = getSelectedConfig()
         if (selected != null) {
-          //  tvServerName.text = "${selected.name} [${selected.endpoint}]"
             tvServerName.text = selected.name
         } else {
-            tvServerName.text = "Warp Auto Clean IP"
+            tvServerName.text = "WARP Auto Clean IP"
+        }
+    }
+    
+    private fun maskEndpoint(endpoint: String): String {
+        return try {
+            val parts = endpoint.split(":")
+            if (parts.size == 2) {
+                val ipParts = parts[0].split(".")
+                if (ipParts.size == 4) {
+                    "${ipParts[0]}.${ipParts[1]}.**.** : ***"
+                } else {
+                    endpoint
+                }
+            } else {
+                endpoint
+            }
+        } catch (e: Exception) {
+            endpoint
         }
     }
 
@@ -551,10 +567,10 @@ class MainActivity : AppCompatActivity() {
                     bottomSheet.dismiss()
                 }, { deleteConfig ->
                     if (isConnected) {
-                        Toast.makeText(this, "Please disconnect VPN first!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, "Please Disconnect VPN First!", Toast.LENGTH_SHORT).show()
                     } else {
                         deleteConfigById(deleteConfig.id)
-                        appendLog("Deleted config: ${deleteConfig.name}")
+                        appendLog("Deleted Config: ${deleteConfig.name}")
                         refreshList()
                         updateActiveServerName()
                     }
@@ -597,9 +613,10 @@ class MainActivity : AppCompatActivity() {
 
                     val newId = System.currentTimeMillis().toString()
                     val name = "Imported Server #${getAllConfigs().size + 1}"
-                    val endpoint = extractEndpoint(parsedConfig)
+                    val rawEndpoint = extractEndpoint(parsedConfig)
+                    val maskedEndpoint = maskEndpoint(rawEndpoint)
 
-                    saveNewConfig(ConfigModel(newId, name, parsedConfig, endpoint, true))
+                    saveNewConfig(ConfigModel(newId, name, parsedConfig, maskedEndpoint, true))
 
                     appendLog("Config Imported Successfully!")
                     Toast.makeText(this@MainActivity, "Config Imported Successfully!", Toast.LENGTH_SHORT).show()
@@ -731,7 +748,7 @@ class MainActivity : AppCompatActivity() {
     private fun prepareAndConnectVpn() {
         tvStatus.text = "CONNECTING..."
         btnConnectCard.setStrokeColor(Color.parseColor("#F59E0B"))
-        appendLog("Preparing VPN connection...")
+        appendLog("Preparing VPN Connection...")
 
         lifecycleScope.launch(Dispatchers.IO) {
             try {
@@ -742,28 +759,31 @@ class MainActivity : AppCompatActivity() {
                     val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
                     val engineMode = prefs.getString("WARP_ENGINE", "CF_DIRECT") ?: "CF_DIRECT"
 
-                    appendLog("No config found. Requesting NEW Config via Engine: $engineMode...")
+                    appendLog("No Config Found. Requesting NEW Config Via Engine: $engineMode...")
                     val wgcf = WgcfManager()
 
                     try {
                         configStr = wgcf.registerAndGetConfig(engineMode)
-                        appendLog("Config received successfully!")
+                        appendLog("Config Received Successfully!")
                     } catch (e: Exception) {
                         appendLog("Error: ${e.message}")
                         val fallbackEngine = if (engineMode == "CF_DIRECT") "CUSTOM_API" else "CF_DIRECT"
-                        appendLog("Trying fallback engine: $fallbackEngine")
+                        appendLog("Trying Fallback Engine: $fallbackEngine")
                         configStr = wgcf.registerAndGetConfig(fallbackEngine)
                     }
 
+                    val rawEndpoint = extractEndpoint(configStr)
+                    val maskedEndpoint = maskEndpoint(rawEndpoint)
+
                     val newModel = ConfigModel(
                         "warp_${System.currentTimeMillis()}",
-                        "WARP Auto Clean IP",
+                        "Warp Auto Clean IP",
                         configStr,
-                        extractEndpoint(configStr),
+                        maskedEndpoint,
                         true
                     )
                     saveNewConfig(newModel)
-                    appendLog("NEW WARP Config saved!")
+                    appendLog("New Warp Config Saved!")
                 } else {
                     configStr = selectedModel.content
                     appendLog("Using Active Config [${selectedModel.name}]...")
@@ -773,10 +793,10 @@ class MainActivity : AppCompatActivity() {
 
                 try {
                     Config.parse(ByteArrayInputStream(configStr.toByteArray()))
-                    appendLog("✅ Config validation successful")
+                    appendLog("✅ Config Validation Successful")
                 } catch (e: Exception) {
-                    appendLog("❌ Config validation failed: ${e.message}")
-                    throw Exception("Invalid config: ${e.message}")
+                    appendLog("❌ Config Validation Failed: ${e.message}")
+                    throw Exception("Invalid Config: ${e.message}")
                 }
 
                 pendingConfigStr = configStr
@@ -787,7 +807,7 @@ class MainActivity : AppCompatActivity() {
                         appendLog("Requesting VPN Permission...")
                         vpnPermissionLauncher.launch(intent)
                     } else {
-                        appendLog("VPN Permission already granted.")
+                        appendLog("VPN Permission Already Granted.")
                         connectVpnWithPendingConfig()
                     }
                 }
@@ -846,8 +866,8 @@ class MainActivity : AppCompatActivity() {
                     btnConnectCard.setStrokeColor(Color.parseColor("#4ADE80"))
                     imgPower.setColorFilter(Color.parseColor("#4ADE80"))
 
-                    Toast.makeText(this@MainActivity, "WARP TUNNEL Connected!", Toast.LENGTH_SHORT).show()
-                    appendLog("✅ Connected to WARP TUNNEL!")
+                    Toast.makeText(this@MainActivity, "Warp Tunnel Connected!", Toast.LENGTH_SHORT).show()
+                    appendLog("✅ Connected to Warp Tunnel!")
 
                     notificationHelper.updateNotification("Measuring...")
 
@@ -875,8 +895,8 @@ class MainActivity : AppCompatActivity() {
                 backend.setState(tunnel, com.wireguard.android.backend.Tunnel.State.DOWN, null)
 
                 withContext(Dispatchers.Main) {
-                    appendLog("Disconnected from WARP TUNNEL.")
-                    Toast.makeText(this@MainActivity, "WARP TUNNEL Disconnected", Toast.LENGTH_SHORT).show()
+                    appendLog("Disconnected from Warp Tunnel.")
+                    Toast.makeText(this@MainActivity, "Warp Tunnel Disconnected", Toast.LENGTH_SHORT).show()
                     resetUi()
                 }
             } catch (e: Exception) {
@@ -906,16 +926,16 @@ class MainActivity : AppCompatActivity() {
             tvActiveSinceTime.text = "Not Connected"
         }
     }
-
+    
     private fun formatElapsedTime(seconds: Long): String {
         val hours = seconds / 3600
         val minutes = (seconds % 3600) / 60
         val secs = seconds % 60
 
         return when {
-            hours > 0 -> "${hours}h ${minutes}m ${secs}s ago"
-            minutes > 0 -> "${minutes}m ${secs}s ago"
-            else -> "$seconds seconds ago"
+            hours > 0 -> "${hours}H ${minutes}M ${secs}S Ago"
+            minutes > 0 -> "${minutes}M ${secs}S Ago"
+            else -> "$seconds Seconds Ago"
         }
     }
 
@@ -938,7 +958,7 @@ class MainActivity : AppCompatActivity() {
         pingJob?.cancel()
         pingJob = null
     }
-    
+
     private suspend fun runSinglePing() = withContext(Dispatchers.IO) {
         try {
             if (!isConnected) return@withContext
