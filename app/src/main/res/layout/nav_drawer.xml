@@ -250,43 +250,6 @@
                     android:textSize="16sp"
                     android:textStyle="bold" />
 
-                <!-- Split Tunneling Switch -->
-                <RelativeLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp">
-
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_alignParentStart="true"
-                        android:layout_toStartOf="@id/switchSplitTunnel"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Split Tunneling"
-                            android:textColor="?attr/colorOnBackground"
-                            android:textSize="14sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="Select apps to bypass VPN"
-                            android:textColor="#94A3B8"
-                            android:textSize="11sp" />
-                    </LinearLayout>
-
-                    <com.google.android.material.switchmaterial.SwitchMaterial
-                        android:id="@+id/switchSplitTunnel"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_alignParentEnd="true" />
-                </RelativeLayout>
-
                 <!-- Dark Mode Switch -->
                 <RelativeLayout
                     android:layout_width="match_parent"
@@ -401,6 +364,43 @@
                         android:checked="false" />
                 </RelativeLayout>
 
+                <!-- Split Tunneling Switch -->
+                <RelativeLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp">
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentStart="true"
+                        android:layout_toStartOf="@id/switchSplitTunnel"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Split Tunneling"
+                            android:textColor="?attr/colorOnBackground"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Select apps to bypass VPN"
+                            android:textColor="#94A3B8"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/switchSplitTunnel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true" />
+                </RelativeLayout>
+
                 <!-- DNS Settings Section -->
                 <TextView
                     android:layout_width="wrap_content"
@@ -445,12 +445,12 @@
                 <!-- Restore Defaults Button -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnRestoreDefaults"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="20dp"
                     android:text="Restore Defaults"
                     android:textColor="#EF4444"
-                    app:backgroundTint="#291D24"
                     app:cornerRadius="12dp"
                     app:strokeColor="#EF4444"
                     app:strokeWidth="1dp" />
