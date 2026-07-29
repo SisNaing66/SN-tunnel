@@ -210,7 +210,7 @@ class MainActivity : AppCompatActivity() {
         // Load saved preferences
         switchDarkMode.isChecked = isDark
         switchLogs.isChecked = prefs.getBoolean("SHOW_LOGS", true)
-        switchPing.isChecked = prefs.getBoolean("AUTO_PING", true)
+        switchPing.isChecked = prefs.getBoolean("AUTO_PING", false)
         switchSplitTunnel.isChecked = prefs.getBoolean("SPLIT_TUNNEL_ENABLED", false)
 
         val deviceHwid = getDeviceHwid()
@@ -446,7 +446,7 @@ class MainActivity : AppCompatActivity() {
 
                 switchDarkMode.isChecked = true
                 switchLogs.isChecked = true
-                switchPing.isChecked = true
+                switchPing.isChecked = false
                 switchSplitTunnel.isChecked = false
                 rbDnsDefault.isChecked = true
                 setEngineSelectionUI(true)
@@ -908,10 +908,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun formatElapsedTime(seconds: Long): String {
+        val hours = seconds / 3600
+        val minutes = (seconds % 3600) / 60
+        val secs = seconds % 60
+
         return when {
-            seconds < 60 -> "$seconds seconds ago"
-            seconds < 3600 -> "${seconds / 60} minutes ago"
-            else -> "${seconds / 3600} hours ago"
+            hours > 0 -> "${hours}h ${minutes}m ${secs}s ago"
+            minutes > 0 -> "${minutes}m ${secs}s ago"
+            else -> "$seconds seconds ago"
         }
     }
 
