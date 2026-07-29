@@ -16,12 +16,12 @@
         <item name="android:windowLightStatusBar">true</item>
     </style>
 
-    <!-- Light Custom Dialog Style -->
+    <!-- Light Mode Dialog Style -->
     <style name="DarkCustomDialog" parent="Theme.MaterialComponents.DayNight.Dialog.Alert">
         <item name="android:windowBackground">@drawable/dialog_rounded_bg</item>
-        <item name="android:textColorPrimary">#FFFFFF</item>
-        <item name="android:textColorSecondary">#94A3B8</item>
-        <item name="colorAccent">#38BDF8</item>
-        <item name="colorPrimary">#38BDF8</item>
+        <item name="android:textColorPrimary">#0F172A</item>
+        <item name="android:textColorSecondary">#475569</item>
+        <item name="colorAccent">#0284C7</item>
+        <item name="colorPrimary">#0284C7</item>
     </style>
 </resources>
