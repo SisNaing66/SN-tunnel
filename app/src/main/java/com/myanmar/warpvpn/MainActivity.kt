@@ -301,7 +301,7 @@ class MainActivity : AppCompatActivity() {
             showHwidDialog(getDeviceHwid())
         }
 
-        // 💡 Ads Click Listeners
+        // Ads Click Listeners
         cardAdBanner.setOnClickListener { openTelegramNkka() }
         btnGetAd.setOnClickListener { openTelegramNkka() }
 
@@ -519,9 +519,10 @@ class MainActivity : AppCompatActivity() {
     private fun updateActiveServerName() {
         val selected = getSelectedConfig()
         if (selected != null) {
-            tvServerName.text = "${selected.name} [${selected.endpoint}]"
+          //  tvServerName.text = "${selected.name} [${selected.endpoint}]"
+            tvServerName.text = selected.name
         } else {
-            tvServerName.text = "WARP Auto Clean IP [Auto]"
+            tvServerName.text = "Warp Auto Clean IP"
         }
     }
 
