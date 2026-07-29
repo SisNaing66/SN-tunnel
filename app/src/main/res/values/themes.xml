@@ -24,4 +24,9 @@
         <item name="colorAccent">#0284C7</item>
         <item name="colorPrimary">#0284C7</item>
     </style>
+
+    <style name="CircleImageView">
+        <item name="cornerSize">50%</item>
+    </style>
+    
 </resources>
