@@ -6,11 +6,11 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
-import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -90,6 +90,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnRestoreDefaults: MaterialButton
     private lateinit var tvTelegram: TextView
 
+    // New Views for HWID and Split Tunneling
+    private lateinit var cardHwid: MaterialCardView
+    private lateinit var tvHwid: TextView
+    private lateinit var switchSplitTunnel: SwitchMaterial
+
     private var isConnected = false
     private var pingJob: Job? = null
     private var pendingConfigStr: String? = null
@@ -98,7 +103,6 @@ class MainActivity : AppCompatActivity() {
     private val tunnel = WgTunnel()
     private val notificationHelper by lazy { NotificationHelper(this) }
 
-    // 💡 Notification Permission Launcher (Android 13+)
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -176,35 +180,43 @@ class MainActivity : AppCompatActivity() {
         btnRestoreDefaults = findViewById(R.id.btnRestoreDefaults)
         tvTelegram = findViewById(R.id.tvTelegram)
 
+        // Binding HWID and Split Tunnel
+        cardHwid = findViewById(R.id.cardHwid)
+        tvHwid = findViewById(R.id.tvHwid)
+        switchSplitTunnel = findViewById(R.id.switchSplitTunnel)
+
         // Load saved preferences
         switchDarkMode.isChecked = isDark
         switchLogs.isChecked = prefs.getBoolean("SHOW_LOGS", true)
         switchPing.isChecked = prefs.getBoolean("AUTO_PING", true)
+        switchSplitTunnel.isChecked = prefs.getBoolean("SPLIT_TUNNEL_ENABLED", false)
+
+        val deviceHwid = getDeviceHwid()
+        tvHwid.text = deviceHwid
 
         val savedEngine = prefs.getString("WARP_ENGINE", "CF_DIRECT")
         setEngineSelectionUI(savedEngine == "CF_DIRECT")
 
-        // Setup click listeners
         setupListeners()
         
-        // Load DNS setting
         when (prefs.getString("DNS_SETTING", "DEFAULT")) {
             "CLOUDFLARE" -> rbDnsCloudflare.isChecked = true
             "GOOGLE" -> rbDnsGoogle.isChecked = true
             else -> rbDnsDefault.isChecked = true
         }
 
-        // Show/hide logs
         cardLogs.visibility = if (switchLogs.isChecked) View.VISIBLE else View.GONE
 
-        // Update UI
         updateActiveServerName()
         
-        // Initial log
         appendLog("WARP TUNNEL App Started")
         appendLog("Ready to connect...")
-        
+
         checkNotificationPermission()
+    }
+
+    private fun getDeviceHwid(): String {
+        return Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID) ?: "UNKNOWN_HWID"
     }
 
     private fun checkNotificationPermission() {
@@ -234,6 +246,21 @@ class MainActivity : AppCompatActivity() {
 
         cardServer.setOnClickListener {
             showSelectLocationBottomSheet()
+        }
+
+        cardHwid.setOnClickListener {
+            showHwidDialog(getDeviceHwid())
+        }
+
+        switchSplitTunnel.setOnCheckedChangeListener { _, isChecked ->
+            val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
+            prefs.edit().putBoolean("SPLIT_TUNNEL_ENABLED", isChecked).apply()
+            if (isChecked) {
+                appendLog("Split Tunneling Enabled")
+                startActivity(Intent(this, AppListActivity::class.java))
+            } else {
+                appendLog("Split Tunneling Disabled")
+            }
         }
 
         switchDarkMode.setOnCheckedChangeListener { _, isChecked ->
@@ -307,6 +334,38 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun showHwidDialog(hwid: String) {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_hwid, null)
+        val tvHwidValue = dialogView.findViewById<TextView>(R.id.tvHwidValue)
+        val btnCopy = dialogView.findViewById<MaterialButton>(R.id.btnCopyHwid)
+        val btnShare = dialogView.findViewById<MaterialButton>(R.id.btnShareHwid)
+
+        tvHwidValue.text = hwid
+
+        val dialog = AlertDialog.Builder(this, R.style.DarkCustomDialog)
+            .setView(dialogView)
+            .create()
+
+        btnCopy.setOnClickListener {
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clip = ClipData.newPlainText("HWID", hwid)
+            clipboard.setPrimaryClip(clip)
+            Toast.makeText(this, "HWID Copied to Clipboard!", Toast.LENGTH_SHORT).show()
+            dialog.dismiss()
+        }
+
+        btnShare.setOnClickListener {
+            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, hwid)
+            }
+            startActivity(Intent.createChooser(shareIntent, "Share Device HWID"))
+            dialog.dismiss()
+        }
+
+        dialog.show()
+    }
+
     private fun showRestoreDefaultsDialog() {
         val dialog = AlertDialog.Builder(this, R.style.DarkCustomDialog)
             .setTitle("Restore Defaults")
@@ -318,6 +377,7 @@ class MainActivity : AppCompatActivity() {
                 switchDarkMode.isChecked = true
                 switchLogs.isChecked = true
                 switchPing.isChecked = true
+                switchSplitTunnel.isChecked = false
                 rbDnsDefault.isChecked = true
                 setEngineSelectionUI(true)
 
@@ -670,9 +730,27 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch(Dispatchers.IO) {
             try {
                 appendLog("Building Tunnel Session...")
-                val wgConfig = Config.parse(ByteArrayInputStream(configStr.toByteArray()))
+                val parsedConfig = Config.parse(ByteArrayInputStream(configStr.toByteArray()))
 
-                backend.setState(tunnel, com.wireguard.android.backend.Tunnel.State.UP, wgConfig)
+                val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
+                val isSplitEnabled = prefs.getBoolean("SPLIT_TUNNEL_ENABLED", false)
+                val excludedApps = prefs.getStringSet("EXCLUDED_APPS", emptySet()) ?: emptySet()
+
+                val builder = Config.Builder()
+                builder.addPeers(parsedConfig.peers)
+
+                val interBuilderConfig = parsedConfig.`interface`
+
+                if (isSplitEnabled && excludedApps.isNotEmpty()) {
+                    for (pkg in excludedApps) {
+                        interBuilderConfig.excludeApplication(pkg)
+                    }
+                    appendLog("Split Tunneling Active: Excluded ${excludedApps.size} apps.")
+                }
+
+                val finalWgConfig = builder.setInterface(interBuilderConfig).build()
+
+                backend.setState(tunnel, com.wireguard.android.backend.Tunnel.State.UP, finalWgConfig)
 
                 withContext(Dispatchers.Main) {
                     isConnected = true
@@ -743,21 +821,19 @@ class MainActivity : AppCompatActivity() {
 
     private suspend fun runSinglePing() = withContext(Dispatchers.IO) {
         try {
-            // --- 1. Ping Cloudflare (1.1.1.1) ---
             val cfStartTime = System.currentTimeMillis()
             val cfAddress = InetAddress.getByName("1.1.1.1")
             val cfReachable = cfAddress.isReachable(2500)
             val cfPingTime = System.currentTimeMillis() - cfStartTime
 
-            // --- 2. Ping Facebook (facebook.com) ---
             val fbStartTime = System.currentTimeMillis()
             val fbAddress = InetAddress.getByName("facebook.com")
             val fbReachable = fbAddress.isReachable(2500)
             val fbPingTime = System.currentTimeMillis() - fbStartTime
-            
+
             val cfResult = if (cfReachable) "${cfPingTime}ms" else "Timeout"
             val fbResult = if (fbReachable) "${fbPingTime}ms" else "Timeout"
-            
+
             val logMessage = "🏓 Ping -> CF: $cfResult | FB: $fbResult"
             val notiMessage = "CF: $cfResult | FB: $fbResult"
 
