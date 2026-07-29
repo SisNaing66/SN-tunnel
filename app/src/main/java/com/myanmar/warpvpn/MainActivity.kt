@@ -368,7 +368,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun showRestoreDefaultsDialog() {
         val dialog = AlertDialog.Builder(this, R.style.DarkCustomDialog)
-            .setTitle("Restore Defaults")
+            .setTitle("Restore Defaults?")
+            .setIcon(R.drawable.ic_launcher)
             .setMessage("Are you sure you want to reset all settings, configs, and preferences to default?")
             .setPositiveButton("OK") { d, _ ->
                 val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
@@ -400,7 +401,8 @@ class MainActivity : AppCompatActivity() {
     
     private fun showExitDialog() {
         val dialog = AlertDialog.Builder(this, R.style.DarkCustomDialog)
-            .setTitle("Exit WARP TUNNEL?")
+            .setTitle("Exit Warp Tunnel?")
+            .setIcon(R.drawable.ic_launcher)
             .setMessage("Choose whether to minimize to background or exit the app completely.")
             .setPositiveButton("EXIT") { _, _ ->
                 if (isConnected) disconnectVpn()
