@@ -89,11 +89,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var rbDnsGoogle: RadioButton
     private lateinit var btnRestoreDefaults: MaterialButton
     private lateinit var tvTelegram: TextView
-    
+
+    // HWID and Split Tunneling Views
     private lateinit var cardHwid: MaterialCardView
     private lateinit var tvHwid: TextView
     private lateinit var switchSplitTunnel: SwitchMaterial
-    
+
+    // Views for Active Since and Connection Latency
     private lateinit var tvActiveSinceTime: TextView
     private lateinit var btnTestPing: TextView
     private lateinit var tvCfPing: TextView
@@ -728,7 +730,7 @@ class MainActivity : AppCompatActivity() {
                         true
                     )
                     saveNewConfig(newModel)
-                    appendLog("NEW WARP Config Saved!")
+                    appendLog("NEW WARP Config saved!")
                 } else {
                     configStr = selectedModel.content
                     appendLog("Using Active Config [${selectedModel.name}]...")
@@ -811,11 +813,11 @@ class MainActivity : AppCompatActivity() {
                     btnConnectCard.setStrokeColor(Color.parseColor("#4ADE80"))
                     imgPower.setColorFilter(Color.parseColor("#4ADE80"))
 
-                    Toast.makeText(this@MainActivity, "Warp Tunnel Connected!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, "WARP TUNNEL Connected Successfully!", Toast.LENGTH_SHORT).show()
                     appendLog("✅ Connected to WARP TUNNEL!")
 
                     notificationHelper.updateNotification("Measuring...")
-                    
+
                     startActiveSinceTimer()
                     startPingManager()
                 }
@@ -836,9 +838,9 @@ class MainActivity : AppCompatActivity() {
             try {
                 stopPingManager()
                 stopActiveSinceTimer()
-                appendLog("Stopping WARP Tunnel...")
-                backend.setState(tunnel, com.wireguard.android.backend.Tunnel.State.DOWN, null)
 
+                backend.setState(tunnel, com.wireguard.android.backend.Tunnel.State.DOWN, null)
+                
                 withContext(Dispatchers.Main) {
                     appendLog("Disconnected from WARP TUNNEL.")
                     Toast.makeText(this@MainActivity, "WARP TUNNEL Disconnected", Toast.LENGTH_SHORT).show()
@@ -867,7 +869,9 @@ class MainActivity : AppCompatActivity() {
     private fun stopActiveSinceTimer() {
         timerJob?.cancel()
         timerJob = null
-        tvActiveSinceTime.text = "Not Connected"
+        runOnUiThread {
+            tvActiveSinceTime.text = "Not Connected"
+        }
     }
 
     private fun formatElapsedTime(seconds: Long): String {
@@ -900,6 +904,8 @@ class MainActivity : AppCompatActivity() {
 
     private suspend fun runSinglePing() = withContext(Dispatchers.IO) {
         try {
+            if (!isConnected) return@withContext
+
             val cfStartTime = System.currentTimeMillis()
             val cfAddress = InetAddress.getByName("1.1.1.1")
             val cfReachable = cfAddress.isReachable(2500)
@@ -919,35 +925,41 @@ class MainActivity : AppCompatActivity() {
             appendLog(logMessage)
 
             withContext(Dispatchers.Main) {
-                tvCfPing.text = cfResult
-                tvFbPing.text = fbResult
-                notificationHelper.updateNotification(notiMessage)
+                if (isConnected) {
+                    tvCfPing.text = cfResult
+                    tvFbPing.text = fbResult
+                    notificationHelper.updateNotification(notiMessage)
+                }
             }
 
         } catch (e: Exception) {
-            appendLog("Ping Error: ${e.localizedMessage}")
-            withContext(Dispatchers.Main) {
-                tvCfPing.text = "N/A"
-                tvFbPing.text = "N/A"
-                notificationHelper.updateNotification("Ping Error")
+            if (isActive) {
+                appendLog("Ping Error: ${e.localizedMessage}")
+                withContext(Dispatchers.Main) {
+                    tvCfPing.text = "N/A"
+                    tvFbPing.text = "N/A"
+                    notificationHelper.updateNotification("Ping Error")
+                }
             }
         }
     }
 
     private fun resetUi() {
-        stopPingManager()
-        stopActiveSinceTimer()
+        runOnUiThread {
+            stopPingManager()
+            stopActiveSinceTimer()
 
-        isConnected = false
-        tvStatus.text = "TAP TO CONNECT"
-        tvStatus.setTextColor(Color.parseColor("#94A3B8"))
-        btnConnectCard.setStrokeColor(Color.parseColor("#334155"))
-        imgPower.setColorFilter(Color.parseColor("#94A3B8"))
+            isConnected = false
+            tvStatus.text = "TAP TO CONNECT"
+            tvStatus.setTextColor(Color.parseColor("#94A3B8"))
+            btnConnectCard.setStrokeColor(Color.parseColor("#334155"))
+            imgPower.setColorFilter(Color.parseColor("#94A3B8"))
 
-        tvCfPing.text = "N/A"
-        tvFbPing.text = "N/A"
+            tvCfPing.text = "N/A"
+            tvFbPing.text = "N/A"
 
-        notificationHelper.cancelNotification()
+            notificationHelper.cancelNotification()
+        }
     }
 
     // ==================== Config Management ====================
