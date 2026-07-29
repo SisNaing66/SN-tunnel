@@ -743,24 +743,35 @@ class MainActivity : AppCompatActivity() {
 
     private suspend fun runSinglePing() = withContext(Dispatchers.IO) {
         try {
-            val startTime = System.currentTimeMillis()
-            val address = InetAddress.getByName("1.1.1.1")
-            val reachable = address.isReachable(3000)
-            val pingTime = System.currentTimeMillis() - startTime
+            // --- 1. Ping Cloudflare (1.1.1.1) ---
+            val cfStartTime = System.currentTimeMillis()
+            val cfAddress = InetAddress.getByName("1.1.1.1")
+            val cfReachable = cfAddress.isReachable(2500)
+            val cfPingTime = System.currentTimeMillis() - cfStartTime
 
-            if (reachable) {
-                appendLog("🏓 Ping (1.1.1.1): $pingTime ms")
-                withContext(Dispatchers.Main) {
-                    notificationHelper.updateNotification("$pingTime ms")
-                }
-            } else {
-                appendLog("⏰ Ping Timeout")
-                withContext(Dispatchers.Main) {
-                    notificationHelper.updateNotification("Timeout")
-                }
+            // --- 2. Ping Facebook (facebook.com) ---
+            val fbStartTime = System.currentTimeMillis()
+            val fbAddress = InetAddress.getByName("facebook.com")
+            val fbReachable = fbAddress.isReachable(2500)
+            val fbPingTime = System.currentTimeMillis() - fbStartTime
+            
+            val cfResult = if (cfReachable) "${cfPingTime}ms" else "Timeout"
+            val fbResult = if (fbReachable) "${fbPingTime}ms" else "Timeout"
+            
+            val logMessage = "🏓 Ping -> CF: $cfResult | FB: $fbResult"
+            val notiMessage = "CF: $cfResult | FB: $fbResult"
+
+            appendLog(logMessage)
+
+            withContext(Dispatchers.Main) {
+                notificationHelper.updateNotification(notiMessage)
             }
+
         } catch (e: Exception) {
             appendLog("Ping Error: ${e.localizedMessage}")
+            withContext(Dispatchers.Main) {
+                notificationHelper.updateNotification("Ping Error")
+            }
         }
     }
 
