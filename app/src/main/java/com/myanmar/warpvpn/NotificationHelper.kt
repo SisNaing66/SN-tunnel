@@ -39,7 +39,7 @@ class NotificationHelper(private val context: Context) {
         }
     }
 
-    fun buildNotification(pingMs: String = "Measuring..."): Notification {
+    fun buildNotification(pingStatus: String = "Measuring..."): Notification {
         val intent = Intent(context, MainActivity::class.java)
         val pendingIntent = PendingIntent.getActivity(
             context,
@@ -48,15 +48,9 @@ class NotificationHelper(private val context: Context) {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val subText = if (pingMs.endsWith("ms") || pingMs == "Timeout" || pingMs == "Measuring...") {
-            "Ping: $pingMs"
-        } else {
-            "Ping: $pingMs ms"
-        }
-
         return NotificationCompat.Builder(context, CHANNEL_ID)
             .setContentTitle("WARP TUNNEL")
-            .setContentText("WARP TUNNEL Active & Protected | $subText")
+            .setContentText("Active & Protected | $pingStatus")
             .setSmallIcon(R.drawable.ic_launcher)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -65,8 +59,8 @@ class NotificationHelper(private val context: Context) {
             .build()
     }
 
-    fun updateNotification(pingMs: String) {
-        val notification = buildNotification(pingMs)
+    fun updateNotification(pingStatus: String) {
+        val notification = buildNotification(pingStatus)
         notificationManager.notify(NOTIFICATION_ID, notification)
     }
 
