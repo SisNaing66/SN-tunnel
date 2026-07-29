@@ -412,7 +412,7 @@ class MainActivity : AppCompatActivity() {
             val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             val clip = ClipData.newPlainText("HWID", hwid)
             clipboard.setPrimaryClip(clip)
-            Toast.makeText(this, "HWID Copied to Clipboard!", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "HWID Copied To Clipboard!", Toast.LENGTH_SHORT).show()
             dialog.dismiss()
         }
 
@@ -454,7 +454,7 @@ class MainActivity : AppCompatActivity() {
                 rbDnsDefault.isChecked = true
                 setEngineSelectionUI(true)
 
-                updateLogsAndAdVisibility(false)
+                updateLogsAndAdVisibility(true)
                 updateActiveServerName()
                 appendLog("Restored all settings and configs to default.")
                 Toast.makeText(this, "All settings restored to defaults!", Toast.LENGTH_SHORT).show()
@@ -485,7 +485,7 @@ class MainActivity : AppCompatActivity() {
         tvMessage.text = "Choose whether to minimize to background or exit the app completely."
 
         val dialog = AlertDialog.Builder(this, R.style.DarkCustomDialog)
-            .setTitle("Exit WARP TUNNEL?")
+            .setTitle("Exit Warp Tunnel?")
             .setView(dialogView)
             .setPositiveButton("EXIT") { _, _ ->
                 if (isConnected) disconnectVpn()
@@ -532,7 +532,7 @@ class MainActivity : AppCompatActivity() {
         if (selected != null) {
             tvServerName.text = selected.name
         } else {
-            tvServerName.text = "WARP Auto Clean IP"
+            tvServerName.text = "Warp Auto Clean IP"
         }
     }
     
