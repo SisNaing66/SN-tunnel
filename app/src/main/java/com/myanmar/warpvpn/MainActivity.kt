@@ -737,8 +737,9 @@ class MainActivity : AppCompatActivity() {
                 val excludedApps = prefs.getStringSet("EXCLUDED_APPS", emptySet()) ?: emptySet()
                 
                 val origInterface = parsedConfig.`interface`
+                
                 val interfaceBuilder = com.wireguard.config.Interface.Builder()
-                    .parsePrivateKey(origInterface.privateKey.toBase64())
+                    .setKeyPair(origInterface.keyPair)
                     .addAddresses(origInterface.addresses)
                     .addDnsServers(origInterface.dnsServers)
 
