@@ -428,85 +428,76 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
 
         val displayMetrics = resources.displayMetrics
-        val width = (displayMetrics.widthPixels * 0.85).toInt() // 85% Size
+        val width = (displayMetrics.widthPixels * 0.85).toInt()
         dialog.window?.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
     }
 
     private fun showRestoreDefaultsDialog() {
-        val isDark = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
-        val buttonColor = if (isDark) Color.parseColor("#38BDF8") else Color.parseColor("#0284C7")
-
-        val dialogView = layoutInflater.inflate(R.layout.dialog_custom_content, null)
-        val tvMessage = dialogView.findViewById<TextView>(R.id.tvDialogMessage)
-        tvMessage.text = "Are you sure you want to reset all settings, configs, and preferences to default?"
+        val dialogView = layoutInflater.inflate(R.layout.dialog_restore, null)
+        val btnCancel = dialogView.findViewById<MaterialButton>(R.id.btnRestoreCancel)
+        val btnOk = dialogView.findViewById<MaterialButton>(R.id.btnRestoreOk)
 
         val dialog = AlertDialog.Builder(this, R.style.DarkCustomDialog)
-            .setTitle("Restore Defaults")
             .setView(dialogView)
-            .setPositiveButton("OK") { d, _ ->
-                val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
-                prefs.edit().clear().apply()
-
-                switchDarkMode.isChecked = true
-                switchLogs.isChecked = true
-                switchPing.isChecked = false
-                switchSplitTunnel.isChecked = false
-                rbDnsDefault.isChecked = true
-                setEngineSelectionUI(true)
-
-                updateLogsAndAdVisibility(true)
-                updateActiveServerName()
-                appendLog("Restored all settings and configs to default.")
-                Toast.makeText(this, "All settings restored to defaults!", Toast.LENGTH_SHORT).show()
-                drawerLayout.closeDrawer(GravityCompat.START)
-
-                AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-                d.dismiss()
-            }
-            .setNegativeButton("CANCEL") { d, _ -> d.dismiss() }
             .create()
 
+        btnCancel.setOnClickListener { dialog.dismiss() }
+
+        btnOk.setOnClickListener {
+            val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
+            prefs.edit().clear().apply()
+
+            switchDarkMode.isChecked = true
+            switchLogs.isChecked = false
+            switchPing.isChecked = false
+            switchSplitTunnel.isChecked = false
+            rbDnsDefault.isChecked = true
+            setEngineSelectionUI(true)
+
+            updateLogsAndAdVisibility(false)
+            updateActiveServerName()
+            appendLog("Restored all settings and configs to default.")
+            Toast.makeText(this, "All settings restored to defaults!", Toast.LENGTH_SHORT).show()
+            drawerLayout.closeDrawer(GravityCompat.START)
+
+            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+            dialog.dismiss()
+        }
+
         dialog.show()
-
+        
         val displayMetrics = resources.displayMetrics
-        val width = (displayMetrics.widthPixels * 0.85).toInt() // 85% Size
+        val width = (displayMetrics.widthPixels * 0.85).toInt()
         dialog.window?.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
-
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(buttonColor)
-        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(buttonColor)
     }
 
     private fun showExitDialog() {
-        val isDark = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
-        val buttonColor = if (isDark) Color.parseColor("#38BDF8") else Color.parseColor("#0284C7")
-
-        val dialogView = layoutInflater.inflate(R.layout.dialog_custom_content, null)
-        val tvMessage = dialogView.findViewById<TextView>(R.id.tvDialogMessage)
-        tvMessage.text = "Choose whether to minimize to background or exit the app completely."
+        val dialogView = layoutInflater.inflate(R.layout.dialog_exit, null)
+        val btnCancel = dialogView.findViewById<MaterialButton>(R.id.btnDialogCancel)
+        val btnMinimize = dialogView.findViewById<MaterialButton>(R.id.btnDialogMinimize)
+        val btnExit = dialogView.findViewById<MaterialButton>(R.id.btnDialogExit)
 
         val dialog = AlertDialog.Builder(this, R.style.DarkCustomDialog)
-            .setTitle("Exit Warp Tunnel?")
             .setView(dialogView)
-            .setPositiveButton("EXIT") { _, _ ->
-                if (isConnected) disconnectVpn()
-                finishAffinity()
-            }
-            .setNeutralButton("MINIMIZE") { d, _ ->
-                d.dismiss()
-                moveTaskToBack(true)
-            }
-            .setNegativeButton("CANCEL") { d, _ -> d.dismiss() }
             .create()
 
+        btnCancel.setOnClickListener { dialog.dismiss() }
+
+        btnMinimize.setOnClickListener {
+            dialog.dismiss()
+            moveTaskToBack(true)
+        }
+
+        btnExit.setOnClickListener {
+            if (isConnected) disconnectVpn()
+            finishAffinity()
+        }
+
         dialog.show()
-
+        
         val displayMetrics = resources.displayMetrics
-        val width = (displayMetrics.widthPixels * 0.85).toInt() // 85% Size
+        val width = (displayMetrics.widthPixels * 0.85).toInt()
         dialog.window?.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
-
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(buttonColor)
-        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(buttonColor)
-        dialog.getButton(AlertDialog.BUTTON_NEUTRAL)?.setTextColor(buttonColor)
     }
 
     private fun setEngineSelectionUI(isCfDirect: Boolean) {
