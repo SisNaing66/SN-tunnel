@@ -16,7 +16,7 @@
         <item name="android:windowLightStatusBar">false</item>
     </style>
 
-    <!-- Dark Custom Dialog Style -->
+    <!-- Dark Mode Dialog Style -->
     <style name="DarkCustomDialog" parent="Theme.MaterialComponents.DayNight.Dialog.Alert">
         <item name="android:windowBackground">@drawable/dialog_rounded_bg</item>
         <item name="android:textColorPrimary">#FFFFFF</item>
