@@ -8,11 +8,11 @@ import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.net.VpnService
+import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.view.Window
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.RadioButton
@@ -95,6 +95,7 @@ class MainActivity : AppCompatActivity() {
 
     private val backend by lazy { GoBackend(applicationContext) }
     private val tunnel = WgTunnel()
+    private val notificationHelper by lazy { NotificationHelper(this) }
 
     private val vpnPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -188,7 +189,7 @@ class MainActivity : AppCompatActivity() {
         updateActiveServerName()
         
         // Initial log
-        appendLog("WARP VPN App Started")
+        appendLog("WARP TUNNEL App Started")
         appendLog("Ready to connect...")
     }
     
@@ -245,7 +246,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         btnClearLogs.setOnClickListener {
-            tvLogs.text = "> Logs cleared.\n"
+            tvLogs.text = "Logs cleared.\n"
             Toast.makeText(this, "Logs Cleared", Toast.LENGTH_SHORT).show()
         }
 
@@ -277,13 +278,6 @@ class MainActivity : AppCompatActivity() {
         tvTelegram.setOnClickListener {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/premium_channel_404"))
             startActivity(intent)
-        }
-    }
-    
-    private fun applyCustomDialogBackground(dialog: AlertDialog) {
-        dialog.window?.let { window ->
-            window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-            window.setWindowAnimations(android.R.style.Animation_Dialog)
         }
     }
 
@@ -450,6 +444,7 @@ class MainActivity : AppCompatActivity() {
                 } catch (e: Exception) {
                     e.printStackTrace()
                     Toast.makeText(this@MainActivity, "Invalid Config Format: ${e.message}", Toast.LENGTH_LONG).show()
+                    appendLog("Import Error: ${e.message}")
                 }
             } else {
                 Toast.makeText(this, "Please paste valid Config!", Toast.LENGTH_SHORT).show()
@@ -458,6 +453,7 @@ class MainActivity : AppCompatActivity() {
 
         dialog.show()
     }
+
     private fun parseWireGuardUri(uriString: String): String {
         try {
             val cleanUri = uriString.replace("wireguard://", "")
@@ -661,6 +657,8 @@ class MainActivity : AppCompatActivity() {
 
                     Toast.makeText(this@MainActivity, "WARP TUNNEL Connected Successfully!", Toast.LENGTH_SHORT).show()
                     appendLog("✅ Connected to WARP TUNNEL!")
+                    
+                    notificationHelper.updateNotification("Measuring...")
 
                     startPingManager()
                 }
@@ -684,7 +682,7 @@ class MainActivity : AppCompatActivity() {
                 backend.setState(tunnel, com.wireguard.android.backend.Tunnel.State.DOWN, null)
 
                 withContext(Dispatchers.Main) {
-                    appendLog("Disconnected from TUNNEL.")
+                    appendLog("Disconnected from WARP TUNNEL.")
                     Toast.makeText(this@MainActivity, "WARP TUNNEL Disconnected", Toast.LENGTH_SHORT).show()
                     resetUi()
                 }
@@ -726,8 +724,14 @@ class MainActivity : AppCompatActivity() {
 
             if (reachable) {
                 appendLog("🏓 Ping (1.1.1.1): $pingTime ms")
+                withContext(Dispatchers.Main) {
+                    notificationHelper.updateNotification("$pingTime ms")
+                }
             } else {
                 appendLog("⏰ Ping Timeout")
+                withContext(Dispatchers.Main) {
+                    notificationHelper.updateNotification("Timeout")
+                }
             }
         } catch (e: Exception) {
             appendLog("Ping Error: ${e.localizedMessage}")
@@ -741,6 +745,8 @@ class MainActivity : AppCompatActivity() {
         tvStatus.setTextColor(Color.parseColor("#94A3B8"))
         btnConnectCard.setStrokeColor(Color.parseColor("#334155"))
         imgPower.setColorFilter(Color.parseColor("#94A3B8"))
+        
+        notificationHelper.cancelNotification()
     }
 
     // ==================== Config Management ====================
