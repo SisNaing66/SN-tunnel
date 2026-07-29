@@ -90,7 +90,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnRestoreDefaults: MaterialButton
     private lateinit var tvTelegram: TextView
 
-    // New Views for HWID and Split Tunneling
+    // HWID and Split Tunneling Views
     private lateinit var cardHwid: MaterialCardView
     private lateinit var tvHwid: TextView
     private lateinit var switchSplitTunnel: SwitchMaterial
@@ -723,7 +723,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-
+    
     private fun connectVpnWithPendingConfig() {
         val configStr = pendingConfigStr ?: return
 
@@ -735,20 +735,25 @@ class MainActivity : AppCompatActivity() {
                 val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
                 val isSplitEnabled = prefs.getBoolean("SPLIT_TUNNEL_ENABLED", false)
                 val excludedApps = prefs.getStringSet("EXCLUDED_APPS", emptySet()) ?: emptySet()
+                
+                val origInterface = parsedConfig.`interface`
+                val interfaceBuilder = com.wireguard.config.Interface.Builder()
+                    .parsePrivateKey(origInterface.privateKey.toBase64())
+                    .addAddresses(origInterface.addresses)
+                    .addDnsServers(origInterface.dnsServers)
 
-                val builder = Config.Builder()
-                builder.addPeers(parsedConfig.peers)
-
-                val interBuilderConfig = parsedConfig.`interface`
-
+                origInterface.listenPort.ifPresent { interfaceBuilder.setListenPort(it) }
+                origInterface.mtu.ifPresent { interfaceBuilder.setMtu(it) }
+                
                 if (isSplitEnabled && excludedApps.isNotEmpty()) {
-                    for (pkg in excludedApps) {
-                        interBuilderConfig.excludeApplication(pkg)
-                    }
+                    interfaceBuilder.excludeApplications(excludedApps)
                     appendLog("Split Tunneling Active: Excluded ${excludedApps.size} apps.")
                 }
-
-                val finalWgConfig = builder.setInterface(interBuilderConfig).build()
+                
+                val finalWgConfig = Config.Builder()
+                    .setInterface(interfaceBuilder.build())
+                    .addPeers(parsedConfig.peers)
+                    .build()
 
                 backend.setState(tunnel, com.wireguard.android.backend.Tunnel.State.UP, finalWgConfig)
 
@@ -763,7 +768,6 @@ class MainActivity : AppCompatActivity() {
                     appendLog("✅ Connected to WARP TUNNEL!")
 
                     notificationHelper.updateNotification("Measuring...")
-
                     startPingManager()
                 }
 
