@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.net.Uri
@@ -96,6 +97,17 @@ class MainActivity : AppCompatActivity() {
     private val backend by lazy { GoBackend(applicationContext) }
     private val tunnel = WgTunnel()
     private val notificationHelper by lazy { NotificationHelper(this) }
+
+    // 💡 Notification Permission Launcher (Android 13+)
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            appendLog("Notification Permission Granted!")
+        } else {
+            appendLog("Notification Permission Denied!")
+        }
+    }
 
     private val vpnPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -191,6 +203,20 @@ class MainActivity : AppCompatActivity() {
         // Initial log
         appendLog("WARP TUNNEL App Started")
         appendLog("Ready to connect...")
+        
+        checkNotificationPermission()
+    }
+
+    private fun checkNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    android.Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
     }
     
     private fun setupListeners() {
@@ -657,7 +683,7 @@ class MainActivity : AppCompatActivity() {
 
                     Toast.makeText(this@MainActivity, "WARP TUNNEL Connected Successfully!", Toast.LENGTH_SHORT).show()
                     appendLog("✅ Connected to WARP TUNNEL!")
-                    
+
                     notificationHelper.updateNotification("Measuring...")
 
                     startPingManager()
