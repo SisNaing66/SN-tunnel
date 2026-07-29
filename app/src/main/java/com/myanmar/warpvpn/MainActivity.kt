@@ -71,6 +71,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvStatus: TextView
     private lateinit var tvLogs: TextView
     private lateinit var cardLogs: MaterialCardView
+    private lateinit var cardAdBanner: MaterialCardView
+    private lateinit var btnGetAd: MaterialButton
 
     private lateinit var btnClearLogs: ImageView
     private lateinit var btnCopyLogs: ImageView
@@ -100,6 +102,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnTestPing: TextView
     private lateinit var tvCfPing: TextView
     private lateinit var tvFbPing: TextView
+    private lateinit var tvCfDot: TextView
+    private lateinit var tvFbDot: TextView
 
     private var isConnected = false
     private var pingJob: Job? = null
@@ -167,6 +171,8 @@ class MainActivity : AppCompatActivity() {
         tvStatus = findViewById(R.id.tvStatus)
         tvLogs = findViewById(R.id.tvLogs)
         cardLogs = findViewById(R.id.cardLogs)
+        cardAdBanner = findViewById(R.id.cardAdBanner)
+        btnGetAd = findViewById(R.id.btnGetAd)
 
         btnClearLogs = findViewById(R.id.btnClearLogs)
         btnCopyLogs = findViewById(R.id.btnCopyLogs)
@@ -198,6 +204,8 @@ class MainActivity : AppCompatActivity() {
         btnTestPing = findViewById(R.id.btnTestPing)
         tvCfPing = findViewById(R.id.tvCfPing)
         tvFbPing = findViewById(R.id.tvFbPing)
+        tvCfDot = findViewById(R.id.tvCfDot)
+        tvFbDot = findViewById(R.id.tvFbDot)
 
         // Load saved preferences
         switchDarkMode.isChecked = isDark
@@ -219,7 +227,7 @@ class MainActivity : AppCompatActivity() {
             else -> rbDnsDefault.isChecked = true
         }
 
-        cardLogs.visibility = if (switchLogs.isChecked) View.VISIBLE else View.GONE
+        updateLogsAndAdVisibility(switchLogs.isChecked)
 
         updateActiveServerName()
 
@@ -253,6 +261,25 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun updateLogsAndAdVisibility(showLogs: Boolean) {
+        if (showLogs) {
+            cardLogs.visibility = View.VISIBLE
+            cardAdBanner.visibility = View.GONE
+        } else {
+            cardLogs.visibility = View.GONE
+            cardAdBanner.visibility = View.VISIBLE
+        }
+    }
+
+    private fun openTelegramNkka() {
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/nkka404"))
+            startActivity(intent)
+        } catch (e: Exception) {
+            Toast.makeText(this, "Cannot open Telegram link", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     private fun setupListeners() {
         btnMenu.setOnClickListener {
             drawerLayout.openDrawer(GravityCompat.START)
@@ -273,6 +300,10 @@ class MainActivity : AppCompatActivity() {
         cardHwid.setOnClickListener {
             showHwidDialog(getDeviceHwid())
         }
+
+        // 💡 Ads Click Listeners
+        cardAdBanner.setOnClickListener { openTelegramNkka() }
+        btnGetAd.setOnClickListener { openTelegramNkka() }
 
         btnTestPing.setOnClickListener {
             if (isConnected) {
@@ -308,7 +339,7 @@ class MainActivity : AppCompatActivity() {
         switchLogs.setOnCheckedChangeListener { _, isChecked ->
             val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
             prefs.edit().putBoolean("SHOW_LOGS", isChecked).apply()
-            cardLogs.visibility = if (isChecked) View.VISIBLE else View.GONE
+            updateLogsAndAdVisibility(isChecked)
         }
 
         switchPing.setOnCheckedChangeListener { _, isChecked ->
@@ -420,6 +451,7 @@ class MainActivity : AppCompatActivity() {
                 rbDnsDefault.isChecked = true
                 setEngineSelectionUI(true)
 
+                updateLogsAndAdVisibility(true)
                 updateActiveServerName()
                 appendLog("Restored all settings and configs to default.")
                 Toast.makeText(this, "All settings restored to defaults!", Toast.LENGTH_SHORT).show()
@@ -813,7 +845,7 @@ class MainActivity : AppCompatActivity() {
                     btnConnectCard.setStrokeColor(Color.parseColor("#4ADE80"))
                     imgPower.setColorFilter(Color.parseColor("#4ADE80"))
 
-                    Toast.makeText(this@MainActivity, "WARP TUNNEL Connected Successfully!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, "WARP TUNNEL Connected!", Toast.LENGTH_SHORT).show()
                     appendLog("✅ Connected to WARP TUNNEL!")
 
                     notificationHelper.updateNotification("Measuring...")
@@ -840,7 +872,7 @@ class MainActivity : AppCompatActivity() {
                 stopActiveSinceTimer()
 
                 backend.setState(tunnel, com.wireguard.android.backend.Tunnel.State.DOWN, null)
-                
+
                 withContext(Dispatchers.Main) {
                     appendLog("Disconnected from WARP TUNNEL.")
                     Toast.makeText(this@MainActivity, "WARP TUNNEL Disconnected", Toast.LENGTH_SHORT).show()
@@ -901,7 +933,7 @@ class MainActivity : AppCompatActivity() {
         pingJob?.cancel()
         pingJob = null
     }
-
+    
     private suspend fun runSinglePing() = withContext(Dispatchers.IO) {
         try {
             if (!isConnected) return@withContext
@@ -928,6 +960,10 @@ class MainActivity : AppCompatActivity() {
                 if (isConnected) {
                     tvCfPing.text = cfResult
                     tvFbPing.text = fbResult
+                    
+                    tvCfDot.text = if (cfReachable) "🟢 " else "⚪ "
+                    tvFbDot.text = if (fbReachable) "🟢 " else "⚪ "
+
                     notificationHelper.updateNotification(notiMessage)
                 }
             }
@@ -938,6 +974,8 @@ class MainActivity : AppCompatActivity() {
                 withContext(Dispatchers.Main) {
                     tvCfPing.text = "N/A"
                     tvFbPing.text = "N/A"
+                    tvCfDot.text = "⚪ "
+                    tvFbDot.text = "⚪ "
                     notificationHelper.updateNotification("Ping Error")
                 }
             }
@@ -957,6 +995,8 @@ class MainActivity : AppCompatActivity() {
 
             tvCfPing.text = "N/A"
             tvFbPing.text = "N/A"
+            tvCfDot.text = "⚪ "
+            tvFbDot.text = "⚪ "
 
             notificationHelper.cancelNotification()
         }
