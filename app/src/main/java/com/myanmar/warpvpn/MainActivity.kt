@@ -367,14 +367,20 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showRestoreDefaultsDialog() {
+        val isDark = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
+        val buttonColor = if (isDark) Color.parseColor("#38BDF8") else Color.parseColor("#0284C7")
+        
+        val dialogView = layoutInflater.inflate(R.layout.dialog_custom_content, null)
+        val tvMessage = dialogView.findViewById<TextView>(R.id.tvDialogMessage)
+        tvMessage.text = "Are you sure you want to reset all settings, configs, and preferences to default?"
+
         val dialog = AlertDialog.Builder(this, R.style.DarkCustomDialog)
-            .setTitle("Restore Defaults?")
-            .setIcon(R.drawable.ic_launcher)
-            .setMessage("Are you sure you want to reset all settings, configs, and preferences to default?")
+            .setTitle("Restore Defaults")
+            .setView(dialogView)
             .setPositiveButton("OK") { d, _ ->
                 val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
                 prefs.edit().clear().apply()
-                
+
                 switchDarkMode.isChecked = true
                 switchLogs.isChecked = true
                 switchPing.isChecked = true
@@ -386,7 +392,7 @@ class MainActivity : AppCompatActivity() {
                 appendLog("Restored all settings and configs to default.")
                 Toast.makeText(this, "All settings restored to defaults!", Toast.LENGTH_SHORT).show()
                 drawerLayout.closeDrawer(GravityCompat.START)
-                
+
                 AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
                 d.dismiss()
             }
@@ -395,15 +401,21 @@ class MainActivity : AppCompatActivity() {
 
         dialog.show()
 
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(Color.parseColor("#38BDF8"))
-        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(Color.parseColor("#38BDF8"))
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(buttonColor)
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(buttonColor)
     }
     
     private fun showExitDialog() {
+        val isDark = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
+        val buttonColor = if (isDark) Color.parseColor("#38BDF8") else Color.parseColor("#0284C7")
+        
+        val dialogView = layoutInflater.inflate(R.layout.dialog_custom_content, null)
+        val tvMessage = dialogView.findViewById<TextView>(R.id.tvDialogMessage)
+        tvMessage.text = "Choose whether to minimize to background or exit the app completely."
+
         val dialog = AlertDialog.Builder(this, R.style.DarkCustomDialog)
-            .setTitle("Exit Warp Tunnel?")
-            .setIcon(R.drawable.ic_launcher)
-            .setMessage("Choose whether to minimize to background or exit the app completely.")
+            .setTitle("Exit WARP TUNNEL?")
+            .setView(dialogView)
             .setPositiveButton("EXIT") { _, _ ->
                 if (isConnected) disconnectVpn()
                 finishAffinity()
@@ -416,10 +428,10 @@ class MainActivity : AppCompatActivity() {
             .create()
 
         dialog.show()
-        
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(Color.parseColor("#38BDF8"))
-        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(Color.parseColor("#38BDF8"))
-        dialog.getButton(AlertDialog.BUTTON_NEUTRAL)?.setTextColor(Color.parseColor("#38BDF8"))
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(buttonColor)
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(buttonColor)
+        dialog.getButton(AlertDialog.BUTTON_NEUTRAL)?.setTextColor(buttonColor)
     }
 
     private fun setEngineSelectionUI(isCfDirect: Boolean) {
