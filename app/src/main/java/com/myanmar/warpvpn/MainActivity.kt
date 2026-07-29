@@ -496,7 +496,7 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
         
         val displayMetrics = resources.displayMetrics
-        val width = (displayMetrics.widthPixels * 0.85).toInt()
+        val width = (displayMetrics.widthPixels * 0.90).toInt()
         dialog.window?.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
     }
 
