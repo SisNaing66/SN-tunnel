@@ -66,7 +66,7 @@
             android:clickable="true"
             android:focusable="true"
             android:padding="4dp"
-            android:src="@android:drawable/ic_menu_delete"
+            android:src="@drawable/delete"
             app:tint="#EF4444" />
     </RelativeLayout>
 </com.google.android.material.card.MaterialCardView>
