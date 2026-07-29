@@ -288,8 +288,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showRestoreDefaultsDialog() {
-        val dialog = AlertDialog.Builder(this)
-            .setTitle("Restore Defaults?")
+        val dialog = AlertDialog.Builder(this, R.style.DarkCustomDialog)
+            .setTitle("Restore Defaults")
             .setMessage("Are you sure you want to reset all settings, configs, and preferences to default?")
             .setPositiveButton("OK") { d, _ ->
                 val prefs = getSharedPreferences("WARP_VPN_PREFS", Context.MODE_PRIVATE)
@@ -309,32 +309,35 @@ class MainActivity : AppCompatActivity() {
                 AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
                 d.dismiss()
             }
-            .setNegativeButton("Cancel") { d, _ -> d.dismiss() }
+            .setNegativeButton("CANCEL") { d, _ -> d.dismiss() }
             .create()
 
         dialog.show()
-        dialog.window?.setBackgroundDrawable(ContextCompat.getDrawable(this, R.drawable.dialog_rounded_bg))
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(Color.parseColor("#38BDF8"))
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(Color.parseColor("#38BDF8"))
     }
     
     private fun showExitDialog() {
-        val dialog = AlertDialog.Builder(this)
+        val dialog = AlertDialog.Builder(this, R.style.DarkCustomDialog)
             .setTitle("Exit WARP TUNNEL?")
             .setMessage("Choose whether to minimize to background or exit the app completely.")
-            .setPositiveButton("Exit") { _, _ ->
-                if (isConnected) {
-                    disconnectVpn()
-                }
+            .setPositiveButton("EXIT") { _, _ ->
+                if (isConnected) disconnectVpn()
                 finishAffinity()
             }
-            .setNeutralButton("Minimize") { d, _ ->
+            .setNeutralButton("MINIMIZE") { d, _ ->
                 d.dismiss()
                 moveTaskToBack(true)
             }
-            .setNegativeButton("Cancel") { d, _ -> d.dismiss() }
+            .setNegativeButton("CANCEL") { d, _ -> d.dismiss() }
             .create()
 
         dialog.show()
-        dialog.window?.setBackgroundDrawable(ContextCompat.getDrawable(this, R.drawable.dialog_rounded_bg))
+        
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(Color.parseColor("#38BDF8"))
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(Color.parseColor("#38BDF8"))
+        dialog.getButton(AlertDialog.BUTTON_NEUTRAL)?.setTextColor(Color.parseColor("#38BDF8"))
     }
 
     private fun setEngineSelectionUI(isCfDirect: Boolean) {
@@ -416,7 +419,7 @@ class MainActivity : AppCompatActivity() {
         val btnCancel = dialogView.findViewById<MaterialButton>(R.id.btnCancel)
         val btnImport = dialogView.findViewById<MaterialButton>(R.id.btnImport)
 
-        val dialog = AlertDialog.Builder(this)
+        val dialog = AlertDialog.Builder(this, R.style.DarkCustomDialog)
             .setView(dialogView)
             .create()
 
@@ -424,11 +427,9 @@ class MainActivity : AppCompatActivity() {
 
         btnImport.setOnClickListener {
             val inputText = etConfigInput.text.toString().trim()
-
             if (inputText.isNotEmpty()) {
                 try {
                     var parsedConfig = inputText
-                    
                     if (inputText.startsWith("wireguard://", ignoreCase = true)) {
                         parsedConfig = parseWireGuardUri(inputText)
                     } else {
@@ -449,7 +450,6 @@ class MainActivity : AppCompatActivity() {
                 } catch (e: Exception) {
                     e.printStackTrace()
                     Toast.makeText(this@MainActivity, "Invalid Config Format: ${e.message}", Toast.LENGTH_LONG).show()
-                    appendLog("Import Error: ${e.message}")
                 }
             } else {
                 Toast.makeText(this, "Please paste valid Config!", Toast.LENGTH_SHORT).show()
@@ -457,9 +457,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         dialog.show()
-        applyCustomDialogBackground(dialog)
     }
-
     private fun parseWireGuardUri(uriString: String): String {
         try {
             val cleanUri = uriString.replace("wireguard://", "")
