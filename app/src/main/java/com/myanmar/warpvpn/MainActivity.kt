@@ -230,7 +230,7 @@ class MainActivity : AppCompatActivity() {
 
         updateActiveServerName()
 
-        appendLog("Warp Tunnel App Started")
+        appendLog("SN Tulip Vpn Started")
         appendLog("Ready To Connect...")
 
         checkNotificationPermission()
@@ -270,9 +270,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun openTelegramNkka() {
+    private fun openTelegramSN() {
         try {
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/nkka404"))
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/Result69"))
             startActivity(intent)
         } catch (e: Exception) {
             Toast.makeText(this, "Cannot Open Telegram Link", Toast.LENGTH_SHORT).show()
@@ -301,8 +301,8 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Ads Click Listeners
-        cardAdBanner.setOnClickListener { openTelegramNkka() }
-        btnGetAd.setOnClickListener { openTelegramNkka() }
+        cardAdBanner.setOnClickListener { openTelegramSN() }
+        btnGetAd.setOnClickListener { openTelegramSN() }
 
         btnTestPing.setOnClickListener {
             if (isConnected) {
@@ -391,7 +391,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         tvTelegram.setOnClickListener {
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/premium_channel_404"))
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/noresult6999"))
             startActivity(intent)
         }
     }
@@ -523,7 +523,7 @@ class MainActivity : AppCompatActivity() {
         if (selected != null) {
             tvServerName.text = selected.name
         } else {
-            tvServerName.text = "Warp Auto Clean IP"
+            tvServerName.text = "SN Tulip Vpn Auto Clean IP"
         }
     }
     
@@ -786,7 +786,7 @@ class MainActivity : AppCompatActivity() {
                         true
                     )
                     saveNewConfig(newModel)
-                    appendLog("New Warp Config Saved!")
+                    appendLog("New SN Tulip Vpn Config Saved!")
                 } else {
                     configStr = selectedModel.content
                     appendLog("Using Active Config [${selectedModel.name}]...")
@@ -869,8 +869,8 @@ class MainActivity : AppCompatActivity() {
                     btnConnectCard.setStrokeColor(Color.parseColor("#4ADE80"))
                     imgPower.setColorFilter(Color.parseColor("#4ADE80"))
 
-                    Toast.makeText(this@MainActivity, "Warp Tunnel Connected!", Toast.LENGTH_SHORT).show()
-                    appendLog("✅ Connected to Warp Tunnel!")
+                    Toast.makeText(this@MainActivity, "SN Tulip Vpn Connected!", Toast.LENGTH_SHORT).show()
+                    appendLog("✅ Connected to SN Tulip Vpn!")
 
                     notificationHelper.updateNotification("Measuring...")
 
@@ -898,8 +898,8 @@ class MainActivity : AppCompatActivity() {
                 backend.setState(tunnel, com.wireguard.android.backend.Tunnel.State.DOWN, null)
 
                 withContext(Dispatchers.Main) {
-                    appendLog("Disconnected from Warp Tunnel.")
-                    Toast.makeText(this@MainActivity, "Warp Tunnel Disconnected", Toast.LENGTH_SHORT).show()
+                    appendLog("Disconnected from SN Tulip Vpn.")
+                    Toast.makeText(this@MainActivity, "SN Tulip Vpn Disconnected", Toast.LENGTH_SHORT).show()
                     resetUi()
                 }
             } catch (e: Exception) {
